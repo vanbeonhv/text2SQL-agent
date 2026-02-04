@@ -9,8 +9,7 @@ class ErrorCorrector:
     
     def __init__(self):
         self.llm = LLMProviderFactory.get_provider(
-            provider_type=settings.llm_provider,
-            api_key=settings.gemini_api_key
+            model_tier="thinking"  # Use accurate model for error correction
         )
     
     async def correct_sql_error(

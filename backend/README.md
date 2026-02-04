@@ -12,13 +12,21 @@ AI-powered chatbot that converts natural language questions into SQL queries usi
 - 📊 **Real-time Streaming**: SSE with progress updates at each stage
 - 🎯 **Intent Analysis**: Understand user's question intent
 - 🔍 **Similarity Search**: Find related past queries for better context
+- 📝 **Smart Response Formatting**: Intent-based routing (Python-fast vs LLM-insightful)
+- ⚡ **Model Tiers**: Thinking model for SQL, lightweight for summaries (3-5x faster)
 
 ## Architecture
 
 ```
 User Question → Load Conversation → Intent Analysis → Schema Retrieval 
-→ Find Similar Q&A → Generate SQL → Validate → Execute → Return Results
+→ Find Similar Q&A → Generate SQL (Thinking Model) → Validate → Execute 
+→ Format Response (Intent-based: Python/Hybrid/LLM) → Return Markdown
 ```
+
+**Response Formatting Strategy:**
+- **Simple queries** (list, filter, sort): Python-only (5ms)
+- **Aggregations**: Python table + LLM insights in parallel (350ms)
+- **Complex queries**: Full LLM formatting (2000ms)
 
 All stages stream progress updates to the client in real-time.
 
@@ -27,7 +35,9 @@ All stages stream progress updates to the client in real-time.
 1. **Install dependencies:**
 ```bash
 cd backend
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
 2. **Configure environment:**

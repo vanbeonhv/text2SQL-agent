@@ -11,6 +11,7 @@ STAGE_MESSAGES = {
     "validating_sql": "Validating SQL query...",
     "executing_sql": "Executing query...",
     "correcting_error": "SQL error detected, attempting to fix...",
+    "formatting_response": "Formatting results...",
     "completed": "Query completed successfully!",
     "failed": "Failed to process your request."
 }
@@ -26,6 +27,7 @@ STAGE_ICONS = {
     "validating_sql": "✅",
     "executing_sql": "▶️",
     "correcting_error": "🔧",
+    "formatting_response": "📝",
     "completed": "🎉",
     "failed": "❌"
 }

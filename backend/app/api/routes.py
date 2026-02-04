@@ -18,6 +18,7 @@ from ..models.events import (
     ValidationEvent,
     ResultEvent,
     ErrorEvent,
+    FormattedResponseEvent,
     CompleteEvent
 )
 from ..agents.graph import agent_graph
@@ -136,6 +137,15 @@ async def stream_agent_execution(
                     retry_count=state.get("retry_count", 0)
                 )
                 yield format_sse_event("error", error_event.model_dump())
+        
+        # Emit formatted response (markdown with insights)
+        if "formatted_response" in state and state["formatted_response"]:
+            formatted_event = FormattedResponseEvent(
+                markdown=state["formatted_response"],
+                format_method=state.get("format_method", "python"),
+                has_llm_summary=state.get("has_llm_summary", False)
+            )
+            yield format_sse_event("formatted_response", formatted_event.model_dump())
         
         # Check for completion
         if state.get("is_complete"):

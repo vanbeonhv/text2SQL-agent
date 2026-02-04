@@ -1,0 +1,63 @@
+{
+  "tables": [
+    {
+      "name": "products",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT"
+        },
+        {
+          "name": "price",
+          "type": "REAL"
+        },
+        {
+          "name": "category",
+          "type": "TEXT"
+        },
+        {
+          "name": "stock",
+          "type": "INTEGER"
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true
+        },
+        {
+          "name": "product_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "quantity",
+          "type": "INTEGER"
+        },
+        {
+          "name": "order_date",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "customer_name",
+          "type": "TEXT"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "orders.product_id",
+      "to": "products.id",
+      "type": "foreign_key"
+    }
+  ]
+}

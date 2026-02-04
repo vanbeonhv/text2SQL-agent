@@ -10,6 +10,7 @@ from .nodes import (
     validate_sql_node,
     execute_sql_node,
     correct_error_node,
+    format_response_node,
     save_success_node,
     fail_node,
     should_retry,
@@ -36,6 +37,7 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("validate_sql", validate_sql_node)
     workflow.add_node("execute_sql", execute_sql_node)
     workflow.add_node("correct_error", correct_error_node)
+    workflow.add_node("format_response", format_response_node)
     workflow.add_node("save_success", save_success_node)
     workflow.add_node("fail", fail_node)
     
@@ -64,10 +66,13 @@ def create_agent_graph() -> StateGraph:
         "execute_sql",
         is_execution_success,
         {
-            "success": "save_success",
+            "success": "format_response",  # Format before saving
             "error": "correct_error"
         }
     )
+    
+    # Format response then save
+    workflow.add_edge("format_response", "save_success")
     
     # Conditional edge: retry decision
     workflow.add_conditional_edges(

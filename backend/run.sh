@@ -4,6 +4,15 @@
 echo "🚀 Starting Text-to-SQL Agent Backend"
 echo ""
 
+# Check if virtual environment exists
+if [ ! -d .venv ]; then
+    echo "🔧 Creating virtual environment with uv..."
+    uv venv
+fi
+
+# Activate virtual environment
+source .venv/bin/activate
+
 # Check if .env exists
 if [ ! -f .env ]; then
     echo "⚠️  .env file not found. Creating from .env.example..."

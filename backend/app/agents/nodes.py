@@ -10,6 +10,7 @@ from ..tools.sql_writer import sql_writer
 from ..tools.sql_validator import sql_validator
 from ..tools.sql_executor import sql_executor
 from ..tools.error_corrector import error_corrector
+from ..tools.response_formatter import response_formatter
 from ..database.history import history_manager
 from ..config import settings
 
@@ -138,6 +139,27 @@ async def correct_error_node(state: AgentState) -> AgentState:
     return state
 
 
+async def format_response_node(state: AgentState) -> AgentState:
+    """Format query results to markdown with optional LLM insights."""
+    state["current_stage"] = "formatting_response"
+    
+    # Format response based on intent
+    formatted = await response_formatter.format_response(
+        question=state["question"],
+        intent=state.get("intent", "unknown"),
+        sql=state["generated_sql"],
+        result=state["execution_result"],
+        conversation_history=state.get("conversation_history", [])
+    )
+    
+    # Store formatted response
+    state["formatted_response"] = formatted["markdown"]
+    state["format_method"] = formatted["format_method"]
+    state["has_llm_summary"] = formatted["has_summary"]
+    
+    return state
+
+
 async def save_success_node(state: AgentState) -> AgentState:
     """Save successful query to history."""
     state["current_stage"] = "completed"
@@ -149,10 +171,16 @@ async def save_success_node(state: AgentState) -> AgentState:
         question=state["question"]
     )
     
+    # Save assistant response with formatted markdown
+    response_content = state.get("formatted_response", "")
+    if not response_content:
+        # Fallback if formatting failed
+        response_content = f"SQL: {state['generated_sql']}\nReturned {state['execution_result'].get('count', 0)} rows"
+    
     await conversation_service.save_assistant_response(
         conversation_id=state["conversation_id"],
         sql=state["generated_sql"],
-        result_summary=f"Returned {state['execution_result'].get('count', 0)} rows"
+        result_summary=response_content
     )
     
     # Save to query history for few-shot learning

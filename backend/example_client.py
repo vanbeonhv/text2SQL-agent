@@ -83,6 +83,19 @@ def stream_chat(question: str, conversation_id: str = None):
                             else:
                                 print("   (No results)")
                         
+                        elif event_type == "formatted_response":
+                            markdown = data.get("markdown", "")
+                            format_method = data.get("format_method", "unknown")
+                            has_summary = data.get("has_llm_summary", False)
+                            
+                            print(f"\n{'='*60}")
+                            print(f"📝 Formatted Response (method: {format_method})")
+                            if has_summary:
+                                print("   (includes LLM-generated insights)")
+                            print(f"{'='*60}\n")
+                            print(markdown)
+                            print(f"\n{'='*60}")
+                        
                         elif event_type == "error":
                             error = data.get("error", "Unknown error")
                             retry = data.get("retry_count", 0)

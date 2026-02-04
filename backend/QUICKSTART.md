@@ -6,7 +6,9 @@
 
 ```bash
 cd backend
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment
@@ -22,6 +24,14 @@ nano .env  # or use your favorite editor
 Required configuration:
 ```
 GEMINI_API_KEY=your_actual_api_key_here
+
+# Optional: Configure model tiers
+THINKING_MODEL=gemini-1.5-pro        # For SQL generation (accurate, slower)
+LIGHTWEIGHT_MODEL=gemini-1.5-flash   # For summaries (fast, cheaper)
+
+# Optional: Response formatting settings
+ENABLE_LLM_INSIGHTS=true             # Add LLM insights for aggregations
+MAX_DISPLAY_ROWS=50                  # Max rows in markdown tables
 ```
 
 Get your Gemini API key from: https://makersuite.google.com/app/apikey

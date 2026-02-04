@@ -58,6 +58,13 @@ class ErrorEvent(BaseModel):
     retry_count: Optional[int] = Field(None, description="Current retry attempt")
 
 
+class FormattedResponseEvent(BaseModel):
+    """Formatted response event (markdown with optional insights)."""
+    markdown: str = Field(..., description="Formatted markdown response")
+    format_method: str = Field(..., description="Method used: 'python', 'hybrid', or 'llm'")
+    has_llm_summary: bool = Field(..., description="Whether LLM-generated insights were included")
+
+
 class CompleteEvent(BaseModel):
     """Workflow completion event."""
     success: bool = Field(..., description="Whether workflow completed successfully")

@@ -9,8 +9,7 @@ class SQLWriter:
     
     def __init__(self):
         self.llm = LLMProviderFactory.get_provider(
-            provider_type=settings.llm_provider,
-            api_key=settings.gemini_api_key
+            model_tier="thinking"  # Use accurate model for SQL generation
         )
     
     async def generate_sql(
