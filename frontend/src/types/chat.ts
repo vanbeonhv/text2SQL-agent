@@ -14,10 +14,14 @@ export interface QueryResult {
   columns?: string[];
 }
 
-export interface Conversation {
+export interface ConversationMetadata {
   id: string;
   title: string;
-  created_at: number;
-  updated_at: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Conversation extends ConversationMetadata {
   messages: Message[];
 }
+

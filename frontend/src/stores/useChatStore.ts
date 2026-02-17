@@ -1,10 +1,14 @@
 import { create } from 'zustand';
-import type { Message } from '../types/chat';
+import { api } from '../services/api';
+import type { Message, Conversation, ConversationMetadata } from '../types/chat';
+import type { ConversationResponse } from '../types/api';
 
 interface ChatStore {
   activeConversationId: string | null;
+  activeConversationMetadata: ConversationMetadata | null;
   messages: Message[];
   isStreaming: boolean;
+  isLoadingHistory: boolean;
   
   setActiveConversation: (id: string | null) => void;
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
@@ -12,12 +16,16 @@ interface ChatStore {
   clearMessages: () => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setMessages: (messages: Message[]) => void;
+  setConversationMetadata: (metadata: ConversationMetadata | null) => void;
+  loadConversationHistory: (conversationId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
   activeConversationId: null,
+  activeConversationMetadata: null,
   messages: [],
   isStreaming: false,
+  isLoadingHistory: false,
   
   setActiveConversation: (id) => set({ activeConversationId: id }),
   
@@ -43,9 +51,50 @@ export const useChatStore = create<ChatStore>((set) => ({
     return { messages };
   }),
   
-  clearMessages: () => set({ messages: [] }),
+  clearMessages: () => set({ 
+    messages: [],
+    activeConversationId: null,
+    activeConversationMetadata: null,
+  }),
   
   setIsStreaming: (isStreaming) => set({ isStreaming }),
   
   setMessages: (messages) => set({ messages }),
+
+  setConversationMetadata: (metadata) => set({ activeConversationMetadata: metadata }),
+
+  loadConversationHistory: async (conversationId: string) => {
+    set({ isLoadingHistory: true });
+    try {
+      const conversation: ConversationResponse = await api.getConversation(conversationId);
+      
+      // Convert API messages to store format
+      const messages: Message[] = conversation.messages.map((msg) => ({
+        id: crypto.randomUUID(),
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp).getTime(),
+      }));
+      
+      // Extract metadata
+      const metadata: ConversationMetadata = {
+        id: conversation.id,
+        title: conversation.title,
+        created_at: conversation.created_at,
+        updated_at: conversation.updated_at,
+      };
+
+      set({ 
+        messages,
+        activeConversationId: conversationId,
+        activeConversationMetadata: metadata,
+      });
+    } catch (error) {
+      console.error('Failed to load conversation history:', error);
+      throw error;
+    } finally {
+      set({ isLoadingHistory: false });
+    }
+  },
+
 }));

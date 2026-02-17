@@ -3,19 +3,32 @@ export interface ChatRequest {
   conversation_id?: string;
 }
 
-export interface ConversationResponse {
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface ConversationMetadata {
   id: string;
   title: string;
   created_at: string;
   updated_at: string;
-  messages: Array<{
-    role: string;
-    content: string;
-    timestamp: string;
-  }>;
+}
+
+export interface ConversationResponse extends ConversationMetadata {
+  messages: ConversationMessage[];
+}
+
+export interface ConversationListItem extends ConversationMetadata {}
+
+export interface ConversationsListResponse {
+  conversations: ConversationListItem[];
+  count: number;
 }
 
 export interface HealthResponse {
   status: string;
   version: string;
 }
+

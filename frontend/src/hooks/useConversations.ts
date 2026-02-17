@@ -1,9 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
-import type { ConversationResponse } from '../types/api';
+import type { ConversationResponse, ConversationListItem, ConversationsListResponse } from '../types/api';
 
-export const useConversation = (id: string | null) => {
-  return useQuery<ConversationResponse>({
+interface UseConversationResult {
+  data: ConversationResponse | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  isError: boolean;
+}
+
+interface UseConversationsResult {
+  conversations: ConversationListItem[];
+  isLoading: boolean;
+  error: Error | null;
+  isError: boolean;
+  refetch: () => Promise<any>;
+}
+
+export const useConversation = (id: string | null): UseConversationResult => {
+  const { data, isLoading, error, isError } = useQuery<ConversationResponse>({
     queryKey: ['conversation', id],
     queryFn: () => {
       if (!id) throw new Error('No conversation ID');
@@ -12,16 +27,28 @@ export const useConversation = (id: string | null) => {
     enabled: !!id,
     staleTime: 30000, // 30 seconds
   });
+
+  return {
+    data,
+    isLoading,
+    error: error as Error | null,
+    isError,
+  };
 };
 
-// TODO: Add this endpoint to the backend
-export const useConversations = () => {
-  return useQuery({
+export const useConversations = (): UseConversationsResult => {
+  const { data, isLoading, error, isError, refetch } = useQuery<ConversationsListResponse>({
     queryKey: ['conversations'],
-    queryFn: async () => {
-      // Placeholder - backend endpoint doesn't exist yet
-      return [];
-    },
-    staleTime: 30000,
+    queryFn: () => api.getConversations(),
+    staleTime: 30000, // 30 seconds
   });
+
+  return {
+    conversations: data?.conversations ?? [],
+    isLoading,
+    error: error as Error | null,
+    isError,
+    refetch,
+  };
 };
+

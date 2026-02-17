@@ -48,7 +48,7 @@ export const ChatArea = () => {
   return (
     <main className="h-full flex flex-col bg-light-bg dark:bg-dark-bg">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.length === 0 ? (
             <div className="text-center py-20">
@@ -76,7 +76,7 @@ export const ChatArea = () => {
       </div>
 
       {/* Input area */}
-      <div className="border-t border-default surface p-4">
+      <div className="border-t border-default surface p-4 flex-shrink-0">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           <div className="flex gap-3 items-end">
             <div className="flex-1 relative">
