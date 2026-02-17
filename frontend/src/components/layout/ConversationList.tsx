@@ -19,8 +19,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-y-auto px-2">
-        <div className="p-4 flex items-center justify-center text-muted">
+      <div className="flex-1 min-h-0 overflow-y-auto w-full">
+        <div className="p-4 flex items-center justify-center text-muted h-full">
           <Loader className="w-4 h-4 animate-spin mr-2" />
           Loading conversations...
         </div>
@@ -30,8 +30,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   if (conversations?.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto px-2">
-        <div className="p-4 text-center text-muted text-sm">
+      <div className="flex-1 min-h-0 overflow-y-auto w-full">
+        <div className="p-4 text-center text-muted text-sm h-full flex items-center justify-center">
           No conversations yet
         </div>
       </div>
@@ -39,8 +39,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-2">
-      <div className="space-y-1">
+    <div className="flex-1 min-h-0 overflow-y-auto w-full">
+      <div className="space-y-1 p-2">
         {conversations.map((conversation: ConversationListItem) => (
           <button
             key={conversation.id}

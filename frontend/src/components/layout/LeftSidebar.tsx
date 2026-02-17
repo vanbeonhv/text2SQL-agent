@@ -41,8 +41,8 @@ export const LeftSidebar = () => {
   }
 
   return (
-    <aside className="relative h-full surface border-r border-default flex flex-col">
-      <div className="p-4 space-y-4">
+    <aside className="relative h-full surface border-r border-default flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 p-4 space-y-4 border-b border-default">
         <Button
           className="w-full justify-start gap-2"
           variant="primary"
@@ -74,7 +74,9 @@ export const LeftSidebar = () => {
         onSelectConversation={handleSelectConversation}
       />
 
-      <CollapseToggle expanded={leftExpanded} onToggle={toggleLeft} side="left" />
+      <div className="flex-shrink-0 border-t border-default">
+        <CollapseToggle expanded={leftExpanded} onToggle={toggleLeft} side="left" />
+      </div>
     </aside>
   );
 };
