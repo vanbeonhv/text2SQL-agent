@@ -65,6 +65,12 @@ class FormattedResponseEvent(BaseModel):
     has_llm_summary: bool = Field(..., description="Whether LLM-generated insights were included")
 
 
+class ConversationHistoryEvent(BaseModel):
+    """Loaded conversation history event."""
+    count: int = Field(..., description="Number of messages in conversation history")
+    messages: List[Dict[str, Any]] = Field(..., description="Conversation history messages")
+
+
 class CompleteEvent(BaseModel):
     """Workflow completion event."""
     success: bool = Field(..., description="Whether workflow completed successfully")

@@ -6,11 +6,14 @@ from typing import AsyncGenerator
 from ..models.schemas import (
     ChatRequest,
     ConversationResponse,
+    ConversationsListResponse,
+    ConversationListItem,
     HealthResponse
 )
 from ..models.events import (
     StageEvent,
     ConversationIdEvent,
+    ConversationHistoryEvent,
     IntentEvent,
     SchemaEvent,
     SimilarExamplesEvent,
@@ -42,6 +45,31 @@ def format_sse_event(event_type: str, data: dict) -> str:
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
+async def stream_graph_with_full_state(graph, initial_state):
+    """Stream graph execution with full accumulated state after each node.
+    
+    Helper to handle LangGraph's {node_name: state_update} format
+    and merge updates into accumulated state.
+    
+    Args:
+        graph: Compiled LangGraph
+        initial_state: Initial state dict
+        
+    Yields:
+        Full accumulated state dictionary after each node
+    """
+    accumulated_state = initial_state.copy()
+    
+    # LangGraph astream() returns {node_name: state_update}
+    async for state_update_dict in graph.astream(initial_state):
+        # Merge state update from current node
+        for node_name, state_update in state_update_dict.items():
+            accumulated_state.update(state_update)
+        
+        # Yield full accumulated state
+        yield accumulated_state
+
+
 async def stream_agent_execution(
     question: str,
     conversation_id: str
@@ -66,11 +94,16 @@ async def stream_agent_execution(
         "is_complete": False
     }
     
-    # Track last stage to avoid duplicates
+    # Track last values to avoid duplicate emissions
     last_stage = None
+    last_intent = None
+    last_schema = None
+    last_similar_examples = None
+    last_generated_sql = None
+    conversation_history_emitted = False
     
-    # Stream agent execution
-    async for state in agent_graph.astream(initial_state):
+    # Stream agent execution with full state after each node
+    async for state in stream_graph_with_full_state(agent_graph, initial_state):
         # Get current stage
         current_stage = state.get("current_stage")
         
@@ -84,35 +117,54 @@ async def stream_agent_execution(
             yield format_sse_event("stage", stage_event.model_dump())
             last_stage = current_stage
         
+        # Emit conversation history event when loading_conversation stage is reached
+        if current_stage == "loading_conversation" and not conversation_history_emitted:
+            conversation_history = state.get("conversation_history", [])
+            history_event = ConversationHistoryEvent(
+                count=len(conversation_history),
+                messages=conversation_history
+            )
+            yield format_sse_event("conversation_history", history_event.model_dump())
+            conversation_history_emitted = True
+        
         # Emit specific data events based on what's available
-        if "intent" in state and state["intent"]:
+        # Only emit if value changed to avoid duplicates
+        current_intent = state.get("intent")
+        if current_intent and current_intent != last_intent:
             intent_event = IntentEvent(
-                intent=state["intent"],
+                intent=current_intent,
                 details={}
             )
             yield format_sse_event("intent", intent_event.model_dump())
+            last_intent = current_intent
         
-        if "schema" in state and state["schema"]:
-            schema_data = state["schema"].get("dict", {})
+        current_schema = state.get("schema")
+        if current_schema and current_schema != last_schema:
+            schema_data = current_schema.get("dict", {})
             schema_event = SchemaEvent(
                 tables=schema_data.get("tables", []),
                 relationships=schema_data.get("relationships", [])
             )
             yield format_sse_event("schema", schema_event.model_dump())
+            last_schema = current_schema
         
-        if "similar_examples" in state and state["similar_examples"]:
+        current_examples = state.get("similar_examples")
+        if current_examples and current_examples != last_similar_examples:
             examples_event = SimilarExamplesEvent(
-                count=len(state["similar_examples"]),
-                examples=state["similar_examples"]
+                count=len(current_examples),
+                examples=current_examples
             )
             yield format_sse_event("similar_examples", examples_event.model_dump())
+            last_similar_examples = current_examples
         
-        if "generated_sql" in state and state["generated_sql"]:
+        current_sql = state.get("generated_sql")
+        if current_sql and current_sql != last_generated_sql:
             sql_event = SQLEvent(
-                sql=state["generated_sql"],
+                sql=current_sql,
                 explanation=None
             )
             yield format_sse_event("sql", sql_event.model_dump())
+            last_generated_sql = current_sql
         
         if "validation_result" in state and state["validation_result"]:
             validation = state["validation_result"]
@@ -182,6 +234,34 @@ async def chat_stream(request: ChatRequest):
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no"  # Disable nginx buffering
         }
+    )
+
+
+@router.get("/conversations", response_model=ConversationsListResponse)
+async def get_conversations(limit: int = 50):
+    """Get list of all conversations.
+    
+    Args:
+        limit: Maximum number of conversations to return (default 50)
+        
+    Returns:
+        List of conversations with summary info
+    """
+    conversations = await conversation_service.get_all_conversations(limit)
+    
+    items = [
+        ConversationListItem(
+            id=conv["id"],
+            title=conv["title"],
+            created_at=conv["created_at"],
+            updated_at=conv["updated_at"]
+        )
+        for conv in conversations
+    ]
+    
+    return ConversationsListResponse(
+        conversations=items,
+        count=len(items)
     )
 
 

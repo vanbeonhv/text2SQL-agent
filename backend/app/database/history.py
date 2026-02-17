@@ -179,6 +179,53 @@ class HistoryManager:
             "messages": messages
         }
     
+    async def get_all_conversations(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all conversations with summary info.
+        
+        Args:
+            limit: Maximum number of conversations to return (sorted by recent first)
+            
+        Returns:
+            List of conversations with id, created_at, updated_at, and first message as preview
+        """
+        rows = await history_db.fetchall(
+            """
+            SELECT id, created_at, updated_at, user_id
+            FROM conversations
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (limit,)
+        )
+        
+        conversations = []
+        for row in rows:
+            # Get first message for preview/title
+            first_message = await history_db.fetchone(
+                """
+                SELECT content FROM conversation_messages
+                WHERE conversation_id = ? AND role = 'user'
+                ORDER BY timestamp ASC
+                LIMIT 1
+                """,
+                (row["id"],)
+            )
+            
+            title = "New Conversation"
+            if first_message:
+                content = first_message["content"]
+                # Truncate to first 50 chars for title
+                title = content[:50] + ("..." if len(content) > 50 else "")
+            
+            conversations.append({
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "title": title
+            })
+        
+        return conversations
+    
     async def save_query(
         self,
         conversation_id: str,

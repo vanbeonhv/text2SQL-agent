@@ -25,6 +25,20 @@ class ConversationResponse(BaseModel):
     messages: List[ConversationMessage] = Field(..., description="List of messages in conversation")
 
 
+class ConversationListItem(BaseModel):
+    """Conversation item for list view."""
+    id: str = Field(..., description="Conversation ID")
+    title: str = Field(..., description="Conversation title (from first message)")
+    created_at: datetime = Field(..., description="Conversation creation time")
+    updated_at: datetime = Field(..., description="Last update time")
+
+
+class ConversationsListResponse(BaseModel):
+    """Response model for conversations list endpoint."""
+    conversations: List[ConversationListItem] = Field(..., description="List of conversations")
+    count: int = Field(..., description="Total number of conversations returned")
+
+
 class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
     status: str = Field(..., description="Service status")

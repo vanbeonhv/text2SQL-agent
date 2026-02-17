@@ -112,6 +112,17 @@ class ConversationService:
             Full conversation details or None if not found
         """
         return await history_manager.get_conversation(conversation_id)
+    
+    async def get_all_conversations(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all conversations with summary info.
+        
+        Args:
+            limit: Maximum number of conversations to return
+            
+        Returns:
+            List of conversations
+        """
+        return await history_manager.get_all_conversations(limit)
 
 
 # Global conversation service instance
