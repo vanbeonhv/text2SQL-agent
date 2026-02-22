@@ -2,7 +2,7 @@
 import asyncio
 import json
 from .history import history_manager
-from .connection import target_db
+from .connection import history_db, target_db
 from ..config import settings
 
 
@@ -115,13 +115,17 @@ async def main():
     """Initialize all databases."""
     print("Starting database initialization...\n")
     
-    await init_history_db()
-    await init_target_db()
-    await create_example_schema()
-    
-    print("\n✅ All databases initialized successfully!")
-    print(f"\nYou can now run the server with:")
-    print(f"  uvicorn app.main:app --reload")
+    try:
+        await init_history_db()
+        await init_target_db()
+        await create_example_schema()
+        
+        print("\n✅ All databases initialized successfully!")
+        print(f"\nYou can now run the server with:")
+        print(f"  uvicorn app.main:app --reload")
+    finally:
+        await history_db.close()
+        await target_db.close()
 
 
 if __name__ == "__main__":
