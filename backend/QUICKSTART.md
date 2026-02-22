@@ -2,11 +2,13 @@
 
 ## Setup (5 minutes)
 
+Requirements: Python 3.11.x
+
 ### 1. Install Dependencies
 
 ```bash
 cd backend
-uv venv
+uv venv --python 3.11
 source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
