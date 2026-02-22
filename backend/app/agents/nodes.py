@@ -179,8 +179,13 @@ async def save_success_node(state: AgentState) -> AgentState:
     
     await conversation_service.save_assistant_response(
         conversation_id=state["conversation_id"],
+        content=response_content,
         sql=state["generated_sql"],
-        result_summary=response_content
+        result=state.get("execution_result"),
+        metadata={
+            "format_method": state.get("format_method", "python"),
+            "has_llm_summary": state.get("has_llm_summary", False),
+        }
     )
     
     # Save to query history for few-shot learning
@@ -209,8 +214,13 @@ async def fail_node(state: AgentState) -> AgentState:
     
     await conversation_service.save_assistant_response(
         conversation_id=state["conversation_id"],
-        sql=state["generated_sql"],
-        result_summary=f"Failed after {state['retry_count']} attempts: {state.get('error_message', 'Unknown error')}"
+        content=f"Failed after {state['retry_count']} attempts: {state.get('error_message', 'Unknown error')}",
+        sql=state.get("generated_sql"),
+        error=state.get("error_message", "Unknown error"),
+        metadata={
+            "retry_count": state.get("retry_count", 0),
+            "failed": True,
+        }
     )
     
     return state

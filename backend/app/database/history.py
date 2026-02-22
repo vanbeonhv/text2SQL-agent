@@ -1,14 +1,36 @@
 """Chat history and conversation memory database operations."""
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+import json
 from .connection import history_db
 
 
 class HistoryManager:
     """Manages conversation history and query history in SQLite."""
+
+    async def _get_table_columns(self, table_name: str) -> set[str]:
+        """Get current column names for a table."""
+        rows = await history_db.fetchall(f"PRAGMA table_info({table_name})")
+        return {row["name"] for row in rows}
     
     async def init_database(self):
         """Initialize database schema."""
+        # Rebuild incompatible legacy schemas (destructive)
+        existing_message_columns = await self._get_table_columns("conversation_messages")
+        required_message_columns = {
+            "id",
+            "conversation_id",
+            "role",
+            "content",
+            "sql",
+            "result_json",
+            "error",
+            "metadata_json",
+            "timestamp",
+        }
+        if existing_message_columns and not required_message_columns.issubset(existing_message_columns):
+            await self.reset_database()
+            return
+
         # Create conversations table
         await history_db.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
@@ -26,6 +48,10 @@ class HistoryManager:
                 conversation_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                sql TEXT,
+                result_json TEXT,
+                error TEXT,
+                metadata_json TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
@@ -61,6 +87,14 @@ class HistoryManager:
             CREATE INDEX IF NOT EXISTS idx_query_success 
             ON query_history(success)
         """)
+
+    async def reset_database(self):
+        """Drop and recreate all history tables (destructive)."""
+        await history_db.execute("DROP TABLE IF EXISTS query_history")
+        await history_db.execute("DROP TABLE IF EXISTS conversation_messages")
+        await history_db.execute("DROP TABLE IF EXISTS conversations")
+
+        await self.init_database()
     
     async def create_conversation(self, conversation_id: str, user_id: Optional[str] = None):
         """Create a new conversation.
@@ -93,7 +127,11 @@ class HistoryManager:
         self,
         conversation_id: str,
         role: str,
-        content: str
+        content: str,
+        sql: Optional[str] = None,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Save a message to conversation history.
         
@@ -101,10 +139,21 @@ class HistoryManager:
             conversation_id: Conversation UUID
             role: Message role ('user' or 'assistant')
             content: Message content
+            sql: Generated SQL for assistant messages
+            result: Structured query result for assistant messages
+            error: Error message for failed assistant messages
+            metadata: Additional structured metadata
         """
+        result_json = json.dumps(result) if result is not None else None
+        metadata_json = json.dumps(metadata) if metadata is not None else None
+
         await history_db.execute(
-            "INSERT INTO conversation_messages (conversation_id, role, content) VALUES (?, ?, ?)",
-            (conversation_id, role, content)
+            """
+            INSERT INTO conversation_messages
+            (conversation_id, role, content, sql, result_json, error, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (conversation_id, role, content, sql, result_json, error, metadata_json)
         )
         
         # Update conversation updated_at timestamp
@@ -128,10 +177,10 @@ class HistoryManager:
             List of messages with role, content, and timestamp
         """
         query = """
-            SELECT role, content, timestamp
+            SELECT id, role, content, sql, result_json, error, metadata_json, timestamp
             FROM conversation_messages
             WHERE conversation_id = ?
-            ORDER BY timestamp DESC
+            ORDER BY id DESC
         """
         
         if limit:
@@ -142,9 +191,17 @@ class HistoryManager:
         # Reverse to get chronological order
         messages = []
         for row in reversed(rows):
+            result = json.loads(row["result_json"]) if row["result_json"] else None
+            metadata = json.loads(row["metadata_json"]) if row["metadata_json"] else None
+
             messages.append({
+                "id": row["id"],
                 "role": row["role"],
                 "content": row["content"],
+                "sql": row["sql"],
+                "results": result,
+                "error": row["error"],
+                "metadata": metadata,
                 "timestamp": row["timestamp"]
             })
         
@@ -170,9 +227,17 @@ class HistoryManager:
         
         # Get messages
         messages = await self.get_conversation_messages(conversation_id)
+
+        title = "New Conversation"
+        for message in messages:
+            if message["role"] == "user":
+                content = message["content"]
+                title = content[:50] + ("..." if len(content) > 50 else "")
+                break
         
         return {
             "id": conv_row["id"],
+            "title": title,
             "created_at": conv_row["created_at"],
             "updated_at": conv_row["updated_at"],
             "user_id": conv_row["user_id"],

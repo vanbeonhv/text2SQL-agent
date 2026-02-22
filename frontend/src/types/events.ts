@@ -45,6 +45,12 @@ export interface ErrorEvent {
   retry_count?: number;
 }
 
+export interface FormattedResponseEvent {
+  markdown: string;
+  format_method: string;
+  has_llm_summary: boolean;
+}
+
 export interface CompleteEvent {
   success: boolean;
   message?: string;
@@ -60,6 +66,7 @@ export type SSEEvent =
   | { type: 'validation'; data: ValidationEvent }
   | { type: 'result'; data: ResultEvent }
   | { type: 'error'; data: ErrorEvent }
+  | { type: 'formatted_response'; data: FormattedResponseEvent }
   | { type: 'complete'; data: CompleteEvent };
 
 export type StageStatus = 'pending' | 'active' | 'completed' | 'error';

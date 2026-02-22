@@ -6,7 +6,7 @@ import type { SSEEvent } from '../types/events';
 
 export const useChatStream = () => {
   const [error, setError] = useState<string | null>(null);
-  const { addMessage, setIsStreaming, activeConversationId, updateLastMessage } = useChatStore();
+  const { addMessage, setIsStreaming, activeConversationId, updateLastMessage, setActiveConversation } = useChatStore();
   const { updateFromSSE, resetProcess } = useProcessStore();
 
   const streamChat = useCallback(async (question: string) => {
@@ -38,6 +38,7 @@ export const useChatStream = () => {
       let buffer = '';
       let finalSQL = '';
       let finalResults: any = null;
+      let formattedMarkdown = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -65,23 +66,33 @@ export const useChatStream = () => {
             updateFromSSE(sseEvent);
 
             // Capture SQL and results for the message
-            if (eventType === 'sql') {
+            if (eventType === 'conversation_id') {
+              setActiveConversation(data.conversation_id);
+            } else if (eventType === 'sql') {
               finalSQL = data.sql;
+              updateLastMessage({ sql: finalSQL });
             } else if (eventType === 'result') {
               finalResults = {
                 rows: data.rows,
                 count: data.count,
                 columns: data.columns,
               };
+              updateLastMessage({ results: finalResults });
+            } else if (eventType === 'formatted_response') {
+              formattedMarkdown = data.markdown || '';
+              updateLastMessage({
+                content: formattedMarkdown,
+                metadata: {
+                  format_method: data.format_method,
+                  has_llm_summary: data.has_llm_summary,
+                },
+              });
             } else if (eventType === 'complete') {
-              // Update the last assistant message with SQL and results
-              if (finalSQL || finalResults) {
-                updateLastMessage({
-                  content: finalSQL ? `Generated SQL:\n\`\`\`sql\n${finalSQL}\n\`\`\`` : 'Query completed',
-                  sql: finalSQL,
-                  results: finalResults,
-                });
-              }
+              updateLastMessage({
+                content: formattedMarkdown || (finalSQL ? 'Query completed' : 'No response generated'),
+                sql: finalSQL || undefined,
+                results: finalResults,
+              });
             } else if (eventType === 'error') {
               updateLastMessage({
                 content: 'Error occurred',
@@ -107,6 +118,7 @@ export const useChatStream = () => {
     activeConversationId,
     addMessage,
     setIsStreaming,
+    setActiveConversation,
     updateFromSSE,
     resetProcess,
     updateLastMessage,

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
-import type { Message, Conversation, ConversationMetadata } from '../types/chat';
+import type { Message, ConversationMetadata } from '../types/chat';
 import type { ConversationResponse } from '../types/api';
 
 interface ChatStore {
@@ -43,10 +43,13 @@ export const useChatStore = create<ChatStore>((set) => ({
   updateLastMessage: (updates) => set((state) => {
     const messages = [...state.messages];
     if (messages.length > 0) {
-      messages[messages.length - 1] = {
-        ...messages[messages.length - 1],
-        ...updates,
-      };
+      const lastMessage = messages.at(-1);
+      if (lastMessage) {
+        messages[messages.length - 1] = {
+          ...lastMessage,
+          ...updates,
+        };
+      }
     }
     return { messages };
   }),
@@ -70,9 +73,13 @@ export const useChatStore = create<ChatStore>((set) => ({
       
       // Convert API messages to store format
       const messages: Message[] = conversation.messages.map((msg) => ({
-        id: crypto.randomUUID(),
+        id: `${conversation.id}-${msg.id}`,
         role: msg.role,
         content: msg.content,
+        sql: msg.sql,
+        results: msg.results,
+        error: msg.error,
+        metadata: msg.metadata,
         timestamp: new Date(msg.timestamp).getTime(),
       }));
       

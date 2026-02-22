@@ -9,7 +9,7 @@ from ..config import settings
 async def init_history_db():
     """Initialize history database schema."""
     print("Initializing history database...")
-    await history_manager.init_database()
+    await history_manager.reset_database()
     print(f"✓ History database initialized at {settings.history_db_path}")
 
 

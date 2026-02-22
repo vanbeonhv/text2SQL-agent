@@ -78,25 +78,30 @@ class ConversationService:
     async def save_assistant_response(
         self,
         conversation_id: str,
-        sql: str,
-        result_summary: Optional[str] = None
+        content: str,
+        sql: Optional[str] = None,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Save assistant response to conversation.
         
         Args:
             conversation_id: Conversation ID
+            content: Assistant response content (markdown/text)
             sql: Generated SQL query
-            result_summary: Optional summary of results
+            result: Structured query result
+            error: Error message
+            metadata: Additional structured metadata
         """
-        # Format assistant response
-        response = f"SQL Query: {sql}"
-        if result_summary:
-            response += f"\n{result_summary}"
-        
         await history_manager.save_message(
             conversation_id=conversation_id,
             role="assistant",
-            content=response
+            content=content,
+            sql=sql,
+            result=result,
+            error=error,
+            metadata=metadata,
         )
     
     async def get_full_conversation(

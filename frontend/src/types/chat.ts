@@ -6,6 +6,7 @@ export interface Message {
   sql?: string;
   results?: QueryResult;
   error?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface QueryResult {

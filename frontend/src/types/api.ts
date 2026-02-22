@@ -3,9 +3,22 @@ export interface ChatRequest {
   conversation_id?: string;
 }
 
+export interface QueryResult {
+  success?: boolean;
+  rows: Array<Record<string, any>>;
+  count: number;
+  columns?: string[];
+  error?: string;
+}
+
 export interface ConversationMessage {
+  id: number;
   role: 'user' | 'assistant';
   content: string;
+  sql?: string;
+  results?: QueryResult;
+  error?: string;
+  metadata?: Record<string, any>;
   timestamp: string;
 }
 
