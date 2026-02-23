@@ -11,8 +11,10 @@ from ..tools.sql_validator import sql_validator
 from ..tools.sql_executor import sql_executor
 from ..tools.error_corrector import error_corrector
 from ..tools.response_formatter import response_formatter
+from ..tools.fast_response_builder import build_fast_response
 from ..database.history import history_manager
 from ..config import settings
+from ..constants import FAST_PATH_INTENTS
 
 
 async def load_conversation_node(state: AgentState) -> AgentState:
@@ -56,6 +58,44 @@ async def retrieve_schema_node(state: AgentState) -> AgentState:
         "dict": schema_dict
     }
     
+    return state
+
+
+def is_data_intent(state: AgentState) -> str:
+    """Route to data path or fast path after retrieve_schema.
+    Returns 'data' for SQL pipeline, 'fast' for greeting/goodbye/unknown/schema_request."""
+    intent = state.get("intent") or "unknown"
+    if intent in FAST_PATH_INTENTS:
+        return "fast"
+    return "data"
+
+
+async def fast_response_node(state: AgentState) -> AgentState:
+    """Build and store a fast response for non-data intents (no SQL)."""
+    state["current_stage"] = "fast_response"
+    schema_dict = state.get("schema", {}).get("dict") if state.get("schema") else None
+    markdown = build_fast_response(
+        intent=state.get("intent", "unknown"),
+        schema=schema_dict,
+    )
+    state["formatted_response"] = markdown
+    return state
+
+
+async def save_fast_response_node(state: AgentState) -> AgentState:
+    """Save user message and fast response to conversation (no SQL/history)."""
+    state["current_stage"] = "completed"
+    state["is_complete"] = True
+    await conversation_service.save_user_message(
+        conversation_id=state["conversation_id"],
+        question=state["question"]
+    )
+    await conversation_service.save_assistant_response(
+        conversation_id=state["conversation_id"],
+        content=state.get("formatted_response", ""),
+        sql=None,
+        result=None,
+    )
     return state
 
 

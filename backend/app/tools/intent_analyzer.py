@@ -32,7 +32,7 @@ class IntentAnalyzer:
         
         # Define response schema
         schema = {
-            "intent": "string (one of: data_retrieval, aggregation, filtering, sorting, joining, unknown)",
+            "intent": "string (one of: data_retrieval, aggregation, filtering, sorting, joining, greeting, goodbye, schema_request, unknown)",
             "confidence": "float between 0 and 1",
             "details": "object with additional information"
         }
@@ -75,7 +75,10 @@ Analyze the intent of this question and classify it into one of these categories
 - filtering: Using WHERE conditions
 - sorting: Using ORDER BY
 - joining: Querying multiple related tables
-- unknown: Cannot determine intent
+- greeting: Saying hello, hi, or starting a conversation
+- goodbye: Saying goodbye, bye, or ending the conversation
+- schema_request: Asking what tables/columns exist, show schema, list tables, what can I ask
+- unknown: Cannot determine intent or not related to data
 
 Respond with JSON containing:
 - intent: The classification (one of the above)

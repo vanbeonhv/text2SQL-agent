@@ -12,6 +12,7 @@ STAGE_MESSAGES = {
     "executing_sql": "Executing query...",
     "correcting_error": "SQL error detected, attempting to fix...",
     "formatting_response": "Formatting results...",
+    "fast_response": "Preparing response...",
     "completed": "Query completed successfully!",
     "failed": "Failed to process your request."
 }
@@ -28,6 +29,7 @@ STAGE_ICONS = {
     "executing_sql": "▶️",
     "correcting_error": "🔧",
     "formatting_response": "📝",
+    "fast_response": "⚡",
     "completed": "🎉",
     "failed": "❌"
 }
@@ -46,5 +48,11 @@ INTENT_TYPES = [
     "filtering",
     "sorting",
     "joining",
+    "greeting",
+    "goodbye",
+    "schema_request",
     "unknown"
 ]
+
+# Intents that trigger the fast path (no SQL generation)
+FAST_PATH_INTENTS = {"greeting", "goodbye", "schema_request", "unknown"}

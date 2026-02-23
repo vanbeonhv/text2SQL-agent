@@ -13,9 +13,12 @@ from .nodes import (
     format_response_node,
     save_success_node,
     fail_node,
+    fast_response_node,
+    save_fast_response_node,
     should_retry,
     is_valid_sql,
-    is_execution_success
+    is_execution_success,
+    is_data_intent,
 )
 
 
@@ -40,6 +43,8 @@ def create_agent_graph() -> StateGraph:
     workflow.add_node("format_response", format_response_node)
     workflow.add_node("save_success", save_success_node)
     workflow.add_node("fail", fail_node)
+    workflow.add_node("fast_response", fast_response_node)
+    workflow.add_node("save_fast_response", save_fast_response_node)
     
     # Set entry point
     workflow.set_entry_point("load_conversation")
@@ -47,7 +52,17 @@ def create_agent_graph() -> StateGraph:
     # Add edges (sequential flow)
     workflow.add_edge("load_conversation", "analyze_intent")
     workflow.add_edge("analyze_intent", "retrieve_schema")
-    workflow.add_edge("retrieve_schema", "search_history")
+    # Branch: data intents -> SQL pipeline; non-data -> fast response
+    workflow.add_conditional_edges(
+        "retrieve_schema",
+        is_data_intent,
+        {
+            "data": "search_history",
+            "fast": "fast_response",
+        }
+    )
+    workflow.add_edge("fast_response", "save_fast_response")
+    workflow.add_edge("save_fast_response", END)
     workflow.add_edge("search_history", "generate_sql")
     workflow.add_edge("generate_sql", "validate_sql")
     
@@ -84,7 +99,7 @@ def create_agent_graph() -> StateGraph:
         }
     )
     
-    # End nodes
+    # End nodes (save_success and fail already lead to END)
     workflow.add_edge("save_success", END)
     workflow.add_edge("fail", END)
     

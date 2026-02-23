@@ -68,7 +68,7 @@ export const ChatArea = () => {
 
     const question = input.trim();
     setInput('');
-    
+
     await streamChat(question);
   };
 

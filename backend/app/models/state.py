@@ -19,9 +19,15 @@ class AgentState(TypedDict, total=False):
         conversation_id: UUID for conversation tracking
         current_stage: Current processing stage (for streaming UI updates)
         is_complete: Workflow completion flag
+        formatted_response: Final markdown response (data or fast path)
+        format_method: How response was formatted (python/hybrid/llm)
+        has_llm_summary: Whether LLM insights were included
     """
     question: str
     intent: str
+    formatted_response: str
+    format_method: str
+    has_llm_summary: bool
     schema: Dict[str, Any]
     conversation_history: List[Dict[str, str]]
     similar_examples: List[Dict[str, Any]]
