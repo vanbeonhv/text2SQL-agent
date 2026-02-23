@@ -96,12 +96,12 @@ body {
 .shiki-container pre {
   padding: 1rem;
   margin: 0;
-  background-color: transparent;
+  background-color: transparent !important;
   font-family: 'Fira Code', 'Consolas', monospace !important;
 }
 
 .shiki-container code {
-  background-color: transparent;
+  background-color: transparent !important;
   font-family: 'Fira Code', 'Consolas', monospace !important;
 }
 

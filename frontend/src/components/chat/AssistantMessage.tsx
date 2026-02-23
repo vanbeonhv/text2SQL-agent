@@ -122,8 +122,8 @@ export const AssistantMessage = ({ message }: AssistantMessageProps) => {
 
         {/* SQL Query */}
         {message.sql && (
-          <div className="surface elevated rounded-lg overflow-hidden border border-default">
-            <div className="px-4 py-2 border-b border-default bg-light-elevated dark:bg-dark-elevated flex items-center gap-2">
+          <div className="surface rounded-lg overflow-hidden border border-default">
+            <div className="px-4 py-2 border-b border-default surface flex items-center gap-2">
               <Database className="w-4 h-4 text-primary" />
               <span className="text-xs font-medium">Generated SQL</span>
             </div>

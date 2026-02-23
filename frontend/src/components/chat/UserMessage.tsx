@@ -8,8 +8,10 @@ interface UserMessageProps {
 export const UserMessage = ({ message }: UserMessageProps) => {
   return (
     <div className="flex gap-3 justify-end">
-      <div className="max-w-[80%] rounded-lg px-4 py-3 bg-primary text-white">
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+      <div className="max-w-[80%] surface elevated rounded-lg px-4 py-3">
+        <p className="text-sm whitespace-pre-wrap wrap-break-word">
+          {message.content}
+        </p>
       </div>
       <Avatar fallback="U" size="sm" />
     </div>
