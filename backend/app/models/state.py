@@ -33,3 +33,7 @@ class AgentState(TypedDict, total=False):
     conversation_id: str
     current_stage: str
     is_complete: bool
+    # Response formatting fields
+    formatted_response: str
+    format_method: str
+    has_llm_summary: bool

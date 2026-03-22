@@ -149,7 +149,6 @@ async def format_response_node(state: AgentState) -> AgentState:
         intent=state.get("intent", "unknown"),
         sql=state["generated_sql"],
         result=state["execution_result"],
-        conversation_history=state.get("conversation_history", [])
     )
     
     # Store formatted response

@@ -134,63 +134,65 @@ class LLMSummarizer:
         result: Dict[str, Any],
         intent: str = "unknown"
     ) -> str:
-        """Generate brief insight/summary about query results.
-        
+        """Generate insight/summary about query results using SQL + data context.
+
         Uses lightweight model for speed (300-800ms vs 1500-3000ms).
-        
+
         Args:
             question: User's original question
             sql: Generated SQL query
             result: Query execution result
             intent: Detected intent
-            
+
         Returns:
-            1-2 sentence insight
+            2-3 sentence insight that directly answers the user's question
         """
         count = result.get("count", 0)
         rows = result.get("rows", [])
-        
+        columns = result.get("columns", [])
+
         # Don't generate insights for empty results
         if count == 0:
             return ""
-        
-        # Sample first 5 rows for LLM context (reduce token usage)
-        sample_data = rows[:5]
-        
-        # Build concise prompt
-        prompt = f"""Analyze this SQL query result and provide a brief insight.
 
-Question: "{question}"
+        # Sample up to 10 rows for LLM context
+        sample_data = rows[:10]
+
+        # Build prompt with full SQL + data context
+        prompt = f"""You are a helpful data analyst. A user asked a question and an SQL query was run to answer it.
+
+User question: "{question}"
 Intent: {intent}
-SQL: {sql}
-Result: {count} rows returned
 
-Sample data (first 5 rows):
+SQL query that was executed:
+```sql
+{sql}
+```
+
+Query results: {count} row(s) returned
+Columns: {columns}
+
+Sample data (up to 10 rows):
 {sample_data}
 
-Provide a 1-2 sentence insight that:
-- Highlights the key finding or pattern
-- Mentions notable numbers or trends
-- Is conversational and helpful
-- Does NOT just restate the row count
+Write a 2-3 sentence summary that:
+- Directly answers the user's question based on the data
+- Highlights key findings, patterns, or notable values
+- Mentions specific numbers or names from the data when relevant
+- Is conversational and easy to understand
+- Does NOT just restate the row count or describe what the query does
 
-Examples:
-- "The data shows most products are priced between $50-$200, with Electronics being the most common category."
-- "Sales peaked in Q4 with $1.2M revenue, representing a 35% increase from Q3."
-- "The average order value is $156, with the top 3 customers accounting for 40% of total orders."
+Your summary:"""
 
-Your insight:"""
-        
         try:
-            # Fast generation with lightweight model
             insight = await self.llm.generate(
                 prompt=prompt,
                 temperature=0.3,
-                max_tokens=150  # Keep it brief!
+                max_tokens=200
             )
-            
-            return f"\n\n### 💡 Insights\n\n{insight.strip()}"
-        
+
+            return f"\n\n### 💡 Summary\n\n{insight.strip()}"
+
         except Exception as e:
             # Fail gracefully - return empty string if LLM fails
             print(f"LLM insight generation failed: {e}")
@@ -274,96 +276,36 @@ class ResponseFormatter:
         intent: str,
         sql: str,
         result: Dict[str, Any],
-        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Format query response with optimal strategy.
-        
-        Routes to:
-        - Python-only for simple queries (fastest)
-        - Hybrid (Python + LLM) for aggregations
-        - Full LLM for complex cases
-        
+        """Format query response: Python table + LLM summary for all intents.
+
         Args:
             question: User's question
             intent: Detected intent
             sql: Generated SQL
             result: Query execution result
-            conversation_history: Previous messages
-            
+            conversation_history: Previous messages (unused, kept for API compatibility)
+
         Returns:
             {
                 "markdown": str,
                 "has_summary": bool,
-                "format_method": "python" | "hybrid" | "llm"
+                "format_method": "hybrid" | "python"
             }
         """
-        count = result.get("count", 0)
-        
-        # FAST PATH: Simple queries - Python only
-        if intent in ["data_retrieval", "filtering", "sorting"]:
-            markdown = self.python_formatter.format_table(result, intent, question)
-            
-            # Add simple summary
-            if count > 0:
-                markdown += self.python_formatter.format_simple_summary(result, intent)
-            
-            return {
-                "markdown": markdown,
-                "has_summary": False,
-                "format_method": "python",
-                "latency_ms": "~5"  # Approximate
-            }
-        
-        # HYBRID PATH: Aggregations and joins
-        elif intent in ["aggregation", "joining"]:
-            # Check if insights are enabled and result size is reasonable
-            should_generate_insights = (
-                settings.enable_llm_insights 
-                and 0 < count < settings.format_with_llm_threshold
-            )
-            
-            if should_generate_insights:
-                # Parallel: Format table + Generate insights
-                table_md, insight = await asyncio.gather(
-                    self._format_table_async(result, intent, question),
-                    self.llm_summarizer.generate_insight(question, sql, result, intent)
-                )
-                
-                markdown = table_md + insight
-                
-                return {
-                    "markdown": markdown,
-                    "has_summary": True,
-                    "format_method": "hybrid",
-                    "latency_ms": "~350"
-                }
-            else:
-                # Python only if insights disabled or too many rows
-                markdown = self.python_formatter.format_table(result, intent, question)
-                markdown += self.python_formatter.format_simple_summary(result, intent)
-                
-                return {
-                    "markdown": markdown,
-                    "has_summary": False,
-                    "format_method": "python",
-                    "latency_ms": "~5"
-                }
-        
-        # FALLBACK: Complex/Unknown queries - Full LLM
-        else:
-            markdown = await self.llm_summarizer.format_full_response(
-                question=question,
-                sql=sql,
-                result=result,
-                conversation_history=conversation_history
-            )
-            
-            return {
-                "markdown": markdown,
-                "has_summary": True,
-                "format_method": "llm",
-                "latency_ms": "~2000"
-            }
+        # Always run Python table formatting + LLM insight in parallel
+        table_md, insight = await asyncio.gather(
+            self._format_table_async(result, intent, question),
+            self.llm_summarizer.generate_insight(question, sql, result, intent)
+        )
+
+        markdown = table_md + insight
+
+        return {
+            "markdown": markdown,
+            "has_summary": bool(insight),
+            "format_method": "hybrid" if insight else "python",
+        }
     
     async def _format_table_async(
         self,
