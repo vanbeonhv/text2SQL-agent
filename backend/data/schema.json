@@ -1,7 +1,7 @@
 {
   "tables": [
     {
-      "name": "products",
+      "name": "v_staff_hr_format",
       "columns": [
         {
           "name": "id",
@@ -9,55 +9,131 @@
           "primary_key": true
         },
         {
-          "name": "name",
-          "type": "TEXT"
+          "name": "emp_no",
+          "type": "TEXT",
+          "description": "Employee ID (8-digit format)"
         },
         {
-          "name": "price",
-          "type": "REAL"
+          "name": "emp_name",
+          "type": "TEXT",
+          "description": "Full legal name"
+        },
+        {
+          "name": "alias",
+          "type": "TEXT",
+          "description": "Workplace nickname/common name"
+        },
+        {
+          "name": "company",
+          "type": "TEXT",
+          "description": "Legal entity name (e.g. 'Marina View Residences', 'TANGLIN CORPORATION PRIVATE LIMITED', 'WOH HUP ENGINEERING PTE. LTD.', 'WOH HUP HOLDINGS PRIVATE LIMITED', 'WOH HUP (PRIVATE) LIMITED')"
+        },
+        {
+          "name": "classification",
+          "type": "TEXT",
+          "description": "Employment type classification (e.g. 'Staff (Woh Hup)')"
+        },
+        {
+          "name": "occupation",
+          "type": "TEXT",
+          "description": "Specific job title"
         },
         {
           "name": "category",
+          "type": "TEXT",
+          "description": "Functional area (WSHE, M&E, Innovation, etc.)"
+        },
+        {
+          "name": "section",
+          "type": "TEXT",
+          "description": "Sub-division (rarely used, mostly NULL)"
+        },
+        {
+          "name": "division",
+          "type": "TEXT",
+          "description": "Division: General Management & Business Innovation, Production, C&S, Contracts, M&E, Archi Technical, Site Support, Engineering, Corporate Office, QAQC, WSHE, Innovation, Maintenance, Environmental, Social, Governance, Technology, Security, Information Technology, Finance, HR"
+        },
+        {
+          "name": "cost_centre",
+          "type": "TEXT",
+          "description": "Full cost center name / project name"
+        },
+        {
+          "name": "cost_centre_short",
+          "type": "TEXT",
+          "description": "Business acronym / project short name (e.g. BB5, CFC, CPW, CR106, CRP, CTM, FJX, HLD, IWB, JCU, KCD, KG2, KHR, MVR, P105, PDD, PNG, PSR, RKD, SG6, SGK, TBC, TGW, TPY, WCE, WCP, WHH03, WHPL04, WHQ, ZRA, ZRB)"
+        },
+        {
+          "name": "job_level",
+          "type": "TEXT",
+          "description": "Hierarchy level (A=highest executive, B, C, D, E, EG1, F, G, H, I, INC1, INC2, INN2, J, JEG2, K, L, M1, M2, M3, N1, N2, NEG2, O, W30)"
+        },
+        {
+          "name": "hired_date",
+          "type": "DATE",
+          "description": "Original employment start date; ignore NULL values"
+        },
+        {
+          "name": "termination_date",
+          "type": "DATE",
+          "description": "Employment end date \u2014 NULL means currently active employee; NOT NULL means resigned"
+        },
+        {
+          "name": "termination_reason",
           "type": "TEXT"
         },
         {
-          "name": "stock",
-          "type": "INTEGER"
-        }
-      ]
-    },
-    {
-      "name": "orders",
-      "columns": [
-        {
-          "name": "id",
-          "type": "INTEGER",
-          "primary_key": true
+          "name": "remarks",
+          "type": "TEXT",
+          "description": "Additional employment notes"
         },
         {
-          "name": "product_id",
-          "type": "INTEGER"
+          "name": "start_of_deployment",
+          "type": "DATE",
+          "description": "Current assignment start date; NULL means not currently deployed to any project"
         },
         {
-          "name": "quantity",
-          "type": "INTEGER"
+          "name": "end_of_deployment",
+          "type": "DATE",
+          "description": "Current assignment end date; NULL or values 1900-01-01/1900-01-02 mean indefinite/permanent deployment"
         },
         {
-          "name": "order_date",
+          "name": "next_deployment_start_date",
+          "type": "DATE",
+          "description": "Planned future assignment start date; NULL means no future deployment planned"
+        },
+        {
+          "name": "next_deployment_end_date",
+          "type": "DATE",
+          "description": "Planned future assignment end date; NULL means indefinite future deployment"
+        },
+        {
+          "name": "next_deployment_site",
+          "type": "TEXT",
+          "description": "Future assignment location/project"
+        },
+        {
+          "name": "next_deployment_fte",
+          "type": "TEXT",
+          "description": "Future full-time equivalent details"
+        },
+        {
+          "name": "created_at",
           "type": "TIMESTAMP"
         },
         {
-          "name": "customer_name",
-          "type": "TEXT"
+          "name": "updated_at",
+          "type": "TIMESTAMP"
         }
       ]
     }
   ],
-  "relationships": [
-    {
-      "from": "orders.product_id",
-      "to": "products.id",
-      "type": "foreign_key"
-    }
-  ]
+  "relationships": [],
+  "business_context": {
+    "employment_status": "Active employee: termination_date IS NULL OR termination_date > CURRENT_DATE. Resigned employee: termination_date IS NOT NULL AND termination_date <= CURRENT_DATE.",
+    "temporal_query_patterns": "EMPLOYMENT STATUS \u2014 'Who is employed on DATE?': WHERE (termination_date IS NULL OR termination_date > DATE) AND hired_date <= DATE. \nDEPLOYMENT STATUS \u2014 'Who is deployed/assigned on DATE?': WHERE (termination_date IS NULL OR termination_date > DATE) AND start_of_deployment <= DATE AND (end_of_deployment IS NULL OR end_of_deployment >= DATE). \nAVAILABILITY \u2014 'Who is available/unassigned on DATE or from DATE onwards?': WHERE (termination_date IS NULL OR termination_date > DATE) AND hired_date <= DATE AND NOT (  (start_of_deployment IS NOT NULL AND start_of_deployment <= DATE AND (end_of_deployment IS NULL OR end_of_deployment >= DATE))   OR   (next_deployment_start_date IS NOT NULL AND next_deployment_start_date <= DATE AND (next_deployment_end_date IS NULL OR next_deployment_end_date >= DATE))). Business rule: 'Available' = employed but no project assignment covering the date.",
+    "date_sentinel_values": "end_of_deployment = '1900-01-01' or '1900-01-02' means indefinite/permanent deployment (treat as NULL). termination_date NULL = currently employed. start_of_deployment NULL = not deployed to any project. end_of_deployment NULL = indefinite deployment. next_deployment_start_date NULL = no future deployment planned.",
+    "cost_center_mappings": "BB5=Lumina Grand, CFC=Clifford Centre, CPW=Champion Way, CR106=Woh Hup-Dongah JV, CRP=Comcentre Redevelopment Project, CTM=Central Mall, FJX=Newport Plaza, HLD=Holland Drive, HOS13=Tech BIM (C&S), HOS15=Tech BIM (MEP), IWB=Irwell Hill Residences, JCU=J'den, KCD=Contract 821A, KG2=Geras Building 2, KHR=34 Kheam Hock Road, MVR=Marina View Residence, P105=P105 Punggol Interchange & Extension, PDD=Punggol Digital District, PNG=P105 Punggol Interchange & Extension, PSR=Proposed Mixed Development at Pasir Ris Drive 3/8/Central, RKD=The Reef, SG6=Equinix Data Center, SGK=Contract 9177, TGW=Tengah Garden Walk, TPY=Toa Payoh Lorong 1, WCE=unspecified, WCP=Woodlands Checkpoint Extension (Building), WHH03=Finance, WHPL04=Security, WHQ=Woh Hup Building, ZRA=Zion Road Parcel A, ZRB=Zion Road (Parcel B)",
+    "query_notes": "Use CURRENT_DATE for today's date (not date('now')). For cost center queries use cost_centre_short column. Organizational hierarchy: division > category > occupation. Use cost_centre_short for project/site queries (e.g. WHERE cost_centre_short = 'PDD')."
+  }
 }
