@@ -1,4 +1,4 @@
-import type { ChatRequest, ConversationResponse, ConversationsListResponse, HealthResponse } from '../types/api';
+import type { ConversationResponse, ConversationsListResponse, HealthResponse } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -42,6 +42,22 @@ export const api = {
 
   async healthCheck(): Promise<HealthResponse> {
     const response = await fetch(`${API_BASE_URL}/api/health`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async submitFeedback(
+    sql: string,
+    status: 'like' | 'dislike' | 'none',
+    conversationId: string,
+  ): Promise<{ status: string; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql, status, conversation_id: conversationId }),
+    });
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

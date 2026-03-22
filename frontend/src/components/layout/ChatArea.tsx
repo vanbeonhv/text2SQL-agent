@@ -2,18 +2,52 @@ import { Send, Loader2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../../stores/useChatStore';
 import { useChatStream } from '../../hooks/useChatStream';
+import { useConversation } from '../../hooks/useConversations';
 import { cn } from '../../lib/utils';
 import { IconButton } from '../ui/IconButton';
 import { UserMessage } from '../chat/UserMessage';
 import { AssistantMessage } from '../chat/AssistantMessage';
 import { TypingIndicator } from '../chat/TypingIndicator';
+import type { Message } from '../../types/chat';
 
 export const ChatArea = () => {
   const [input, setInput] = useState('');
-  const { messages, isStreaming } = useChatStore();
+  const { messages, isStreaming, activeConversationId, setMessages, setConversationMetadata, setIsLoadingHistory } = useChatStore();
   const { streamChat } = useChatStream();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data, isLoading } = useConversation(activeConversationId);
+
+  // Sync loading state into store so ConversationList can disable buttons
+  useEffect(() => {
+    setIsLoadingHistory(isLoading);
+  }, [isLoading, setIsLoadingHistory]);
+
+  // Sync React Query cached data into the store when conversation changes.
+  // refetchOnWindowFocus is disabled and staleTime is 5min, so this won't
+  // overwrite in-progress streaming messages.
+  useEffect(() => {
+    if (!data) return;
+    const mapped: Message[] = data.messages.map((msg) => ({
+      id: `${data.id}-${msg.id}`,
+      role: msg.role,
+      content: msg.content,
+      sql: msg.sql,
+      results: msg.results,
+      error: msg.error,
+      metadata: msg.metadata,
+      feedback: msg.feedback as 'like' | 'dislike' | null | undefined,
+      timestamp: new Date(msg.timestamp).getTime(),
+    }));
+    setMessages(mapped);
+    setConversationMetadata({
+      id: data.id,
+      title: data.title,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    });
+  }, [data, setMessages, setConversationMetadata]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -71,11 +105,9 @@ export const ChatArea = () => {
           ) : (
             <>
               {messages.map((message) => (
-                message.role === 'user' ? (
-                  <UserMessage key={message.id} message={message} />
-                ) : (
-                  <AssistantMessage key={message.id} message={message} />
-                )
+                message.role === 'user'
+                  ? <UserMessage key={message.id} message={message} />
+                  : <AssistantMessage key={message.id} message={message} />
               ))}
               {isStreaming && <TypingIndicator />}
             </>

@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
 import type { Message, ConversationMetadata } from '../types/chat';
-import type { ConversationResponse } from '../types/api';
 
 interface ChatStore {
   activeConversationId: string | null;
@@ -9,15 +7,16 @@ interface ChatStore {
   messages: Message[];
   isStreaming: boolean;
   isLoadingHistory: boolean;
-  
+
   setActiveConversation: (id: string | null) => void;
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateLastMessage: (updates: Partial<Message>) => void;
+  setMessageFeedback: (messageId: string, feedback: 'like' | 'dislike' | null) => void;
   clearMessages: () => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setMessages: (messages: Message[]) => void;
   setConversationMetadata: (metadata: ConversationMetadata | null) => void;
-  loadConversationHistory: (conversationId: string) => Promise<void>;
+  setIsLoadingHistory: (isLoading: boolean) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -26,9 +25,9 @@ export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
   isStreaming: false,
   isLoadingHistory: false,
-  
+
   setActiveConversation: (id) => set({ activeConversationId: id }),
-  
+
   addMessage: (message) => set((state) => ({
     messages: [
       ...state.messages,
@@ -39,7 +38,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       },
     ],
   })),
-  
+
   updateLastMessage: (updates) => set((state) => {
     const messages = [...state.messages];
     if (messages.length > 0) {
@@ -53,55 +52,24 @@ export const useChatStore = create<ChatStore>((set) => ({
     }
     return { messages };
   }),
-  
-  clearMessages: () => set({ 
+
+  setMessageFeedback: (messageId, feedback) => set((state) => ({
+    messages: state.messages.map((m) =>
+      m.id === messageId ? { ...m, feedback } : m
+    ),
+  })),
+
+  clearMessages: () => set({
     messages: [],
     activeConversationId: null,
     activeConversationMetadata: null,
   }),
-  
+
   setIsStreaming: (isStreaming) => set({ isStreaming }),
-  
+
   setMessages: (messages) => set({ messages }),
 
   setConversationMetadata: (metadata) => set({ activeConversationMetadata: metadata }),
 
-  loadConversationHistory: async (conversationId: string) => {
-    set({ isLoadingHistory: true });
-    try {
-      const conversation: ConversationResponse = await api.getConversation(conversationId);
-      
-      // Convert API messages to store format
-      const messages: Message[] = conversation.messages.map((msg) => ({
-        id: `${conversation.id}-${msg.id}`,
-        role: msg.role,
-        content: msg.content,
-        sql: msg.sql,
-        results: msg.results,
-        error: msg.error,
-        metadata: msg.metadata,
-        timestamp: new Date(msg.timestamp).getTime(),
-      }));
-      
-      // Extract metadata
-      const metadata: ConversationMetadata = {
-        id: conversation.id,
-        title: conversation.title,
-        created_at: conversation.created_at,
-        updated_at: conversation.updated_at,
-      };
-
-      set({ 
-        messages,
-        activeConversationId: conversationId,
-        activeConversationMetadata: metadata,
-      });
-    } catch (error) {
-      console.error('Failed to load conversation history:', error);
-      throw error;
-    } finally {
-      set({ isLoadingHistory: false });
-    }
-  },
-
+  setIsLoadingHistory: (isLoading) => set({ isLoadingHistory: isLoading }),
 }));

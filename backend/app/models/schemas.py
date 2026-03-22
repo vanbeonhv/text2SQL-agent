@@ -1,6 +1,6 @@
 """Pydantic models for API requests and responses."""
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -28,6 +28,7 @@ class ConversationMessage(BaseModel):
     results: Optional[QueryResult] = Field(None, description="Structured query result")
     error: Optional[str] = Field(None, description="Message-level error")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional message metadata")
+    feedback: Optional[str] = Field(None, description="User feedback: 'like', 'dislike', or null")
     timestamp: datetime = Field(..., description="Message timestamp")
 
 
@@ -78,3 +79,16 @@ class SimilarExample(BaseModel):
     question: str = Field(..., description="Similar question")
     sql: str = Field(..., description="Corresponding SQL query")
     similarity_score: Optional[float] = Field(None, description="Similarity score")
+
+
+class FeedbackRequest(BaseModel):
+    """Request model for submitting like/dislike feedback."""
+    conversation_id: str = Field(..., description="Conversation ID")
+    sql: str = Field(..., description="Generated SQL query to identify the message")
+    status: Literal["like", "dislike", "none"] = Field(..., description="Feedback status ('none' clears feedback)")
+
+
+class FeedbackResponse(BaseModel):
+    """Response model for feedback submission."""
+    status: str = Field(..., description="Saved feedback status")
+    message: str = Field(..., description="Confirmation message")

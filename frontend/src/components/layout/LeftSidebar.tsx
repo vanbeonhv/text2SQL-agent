@@ -10,24 +10,15 @@ import { Button } from '../ui/Button';
 
 export const LeftSidebar = () => {
   const { leftExpanded, toggleLeft } = useSidebarStore();
-  const { activeConversationId, loadConversationHistory, isLoadingHistory } = useChatStore();
+  const { activeConversationId, isLoadingHistory, setActiveConversation, clearMessages } = useChatStore();
   const { conversations, isLoading } = useConversations();
 
   const handleNewChat = (): void => {
-    // Clear current conversation
-    useChatStore.setState({ 
-      activeConversationId: null,
-      messages: [],
-      activeConversationMetadata: null,
-    });
+    clearMessages();
   };
 
-  const handleSelectConversation = async (conversationId: string): Promise<void> => {
-    try {
-      await loadConversationHistory(conversationId);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-    }
+  const handleSelectConversation = (conversationId: string): void => {
+    setActiveConversation(conversationId);
   };
 
   if (!leftExpanded) {

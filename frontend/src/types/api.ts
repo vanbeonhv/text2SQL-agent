@@ -19,6 +19,7 @@ export interface ConversationMessage {
   results?: QueryResult;
   error?: string;
   metadata?: Record<string, any>;
+  feedback?: string | null;
   timestamp: string;
 }
 

@@ -47,11 +47,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             onClick={() => onSelectConversation(conversation.id)}
             disabled={isLoadingHistory}
             className={cn(
-              "w-full p-3 rounded-lg text-left transition-colors",
-              "hover:bg-light-elevated dark:hover:bg-dark-elevated",
+              "w-full p-3 rounded-lg text-left transition-all duration-150",
+              "border border-transparent",
+              "hover:bg-light-elevated dark:hover:bg-dark-elevated hover:border-default",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               activeConversationId === conversation.id
-                ? "bg-light-elevated dark:bg-dark-elevated"
+                ? "bg-light-elevated dark:bg-dark-elevated border-default"
                 : ""
             )}
           >

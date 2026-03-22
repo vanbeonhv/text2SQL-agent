@@ -8,7 +8,9 @@ from ..models.schemas import (
     ConversationResponse,
     ConversationsListResponse,
     ConversationListItem,
-    HealthResponse
+    HealthResponse,
+    FeedbackRequest,
+    FeedbackResponse,
 )
 from ..models.events import (
     StageEvent,
@@ -26,6 +28,7 @@ from ..models.events import (
 )
 from ..agents.graph import agent_graph
 from ..services.conversation import conversation_service
+from ..database.history import history_manager
 from ..constants import STAGE_MESSAGES, STAGE_ICONS
 
 
@@ -281,6 +284,30 @@ async def get_conversation(conversation_id: str):
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     return conversation
+
+
+@router.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(request: FeedbackRequest):
+    """Submit like/dislike feedback for a query response.
+
+    Updates the feedback column on the matching assistant message in conversation_messages.
+
+    Args:
+        request: Feedback with conversation_id, sql, and status
+
+    Returns:
+        Confirmation
+    """
+    status = request.status if request.status != "none" else None
+    await history_manager.set_message_feedback(
+        conversation_id=request.conversation_id,
+        sql=request.sql,
+        status=status,
+    )
+    return FeedbackResponse(
+        status=request.status,
+        message="Feedback saved"
+    )
 
 
 @router.get("/health", response_model=HealthResponse)

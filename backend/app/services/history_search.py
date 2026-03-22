@@ -52,8 +52,8 @@ class HistorySearchService:
         Returns:
             List of similar query examples with similarity scores
         """
-        # Get successful queries from history
-        past_queries = await history_manager.get_successful_queries(
+        # Get liked messages (user-approved examples for few-shot learning)
+        past_queries = await history_manager.get_liked_messages(
             limit=100,
             exclude_conversation_id=exclude_conversation_id
         )

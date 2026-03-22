@@ -7,6 +7,7 @@ export interface Message {
   results?: QueryResult;
   error?: string;
   metadata?: Record<string, any>;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface QueryResult {

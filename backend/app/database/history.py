@@ -11,7 +11,7 @@ class HistoryManager:
         """Get current column names for a table."""
         rows = await history_db.fetchall(f"PRAGMA table_info({table_name})")
         return {row["name"] for row in rows}
-    
+
     async def init_database(self):
         """Initialize database schema."""
         # Rebuild incompatible legacy schemas (destructive)
@@ -40,7 +40,7 @@ class HistoryManager:
                 user_id TEXT
             )
         """)
-        
+
         # Create conversation_messages table (for conversation memory)
         await history_db.execute("""
             CREATE TABLE IF NOT EXISTS conversation_messages (
@@ -56,8 +56,8 @@ class HistoryManager:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
-        
-        # Create query_history table (for few-shot learning)
+
+        # Create query_history table (for few-shot learning fallback)
         await history_db.execute("""
             CREATE TABLE IF NOT EXISTS query_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,22 +71,29 @@ class HistoryManager:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
-        
+
         # Create indexes
         await history_db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_conv_messages 
+            CREATE INDEX IF NOT EXISTS idx_conv_messages
             ON conversation_messages(conversation_id, timestamp)
         """)
-        
+
         await history_db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_query_question 
+            CREATE INDEX IF NOT EXISTS idx_query_question
             ON query_history(question)
         """)
-        
+
         await history_db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_query_success 
+            CREATE INDEX IF NOT EXISTS idx_query_success
             ON query_history(success)
         """)
+
+        # Add feedback column to conversation_messages if missing (non-destructive migration)
+        existing_msg_cols = await self._get_table_columns("conversation_messages")
+        if "feedback" not in existing_msg_cols:
+            await history_db.execute(
+                "ALTER TABLE conversation_messages ADD COLUMN feedback TEXT"
+            )
 
     async def reset_database(self):
         """Drop and recreate all history tables (destructive)."""
@@ -95,34 +102,22 @@ class HistoryManager:
         await history_db.execute("DROP TABLE IF EXISTS conversations")
 
         await self.init_database()
-    
+
     async def create_conversation(self, conversation_id: str, user_id: Optional[str] = None):
-        """Create a new conversation.
-        
-        Args:
-            conversation_id: UUID for the conversation
-            user_id: Optional user identifier
-        """
+        """Create a new conversation."""
         await history_db.execute(
             "INSERT INTO conversations (id, user_id) VALUES (?, ?)",
             (conversation_id, user_id)
         )
-    
+
     async def conversation_exists(self, conversation_id: str) -> bool:
-        """Check if conversation exists.
-        
-        Args:
-            conversation_id: Conversation UUID
-            
-        Returns:
-            True if conversation exists
-        """
+        """Check if conversation exists."""
         row = await history_db.fetchone(
             "SELECT 1 FROM conversations WHERE id = ?",
             (conversation_id,)
         )
         return row is not None
-    
+
     async def save_message(
         self,
         conversation_id: str,
@@ -133,17 +128,7 @@ class HistoryManager:
         error: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
-        """Save a message to conversation history.
-        
-        Args:
-            conversation_id: Conversation UUID
-            role: Message role ('user' or 'assistant')
-            content: Message content
-            sql: Generated SQL for assistant messages
-            result: Structured query result for assistant messages
-            error: Error message for failed assistant messages
-            metadata: Additional structured metadata
-        """
+        """Save a message to conversation history."""
         result_json = json.dumps(result) if result is not None else None
         metadata_json = json.dumps(metadata) if metadata is not None else None
 
@@ -155,40 +140,30 @@ class HistoryManager:
             """,
             (conversation_id, role, content, sql, result_json, error, metadata_json)
         )
-        
-        # Update conversation updated_at timestamp
+
         await history_db.execute(
             "UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (conversation_id,)
         )
-    
+
     async def get_conversation_messages(
         self,
         conversation_id: str,
         limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Get conversation message history.
-        
-        Args:
-            conversation_id: Conversation UUID
-            limit: Maximum number of recent messages to return
-            
-        Returns:
-            List of messages with role, content, and timestamp
-        """
+        """Get conversation message history."""
         query = """
-            SELECT id, role, content, sql, result_json, error, metadata_json, timestamp
+            SELECT id, role, content, sql, result_json, error, metadata_json, feedback, timestamp
             FROM conversation_messages
             WHERE conversation_id = ?
             ORDER BY id DESC
         """
-        
+
         if limit:
             query += f" LIMIT {limit}"
-        
+
         rows = await history_db.fetchall(query, (conversation_id,))
-        
-        # Reverse to get chronological order
+
         messages = []
         for row in reversed(rows):
             result = json.loads(row["result_json"]) if row["result_json"] else None
@@ -202,30 +177,101 @@ class HistoryManager:
                 "results": result,
                 "error": row["error"],
                 "metadata": metadata,
+                "feedback": row["feedback"],
                 "timestamp": row["timestamp"]
             })
-        
+
         return messages
-    
-    async def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-        """Get full conversation details.
-        
+
+    async def set_message_feedback(
+        self,
+        conversation_id: str,
+        sql: str,
+        status: Optional[str],
+    ):
+        """Set like/dislike feedback on an assistant message.
+
+        Identifies the message by conversation_id + sql (most recent match).
+
         Args:
             conversation_id: Conversation UUID
-            
-        Returns:
-            Conversation details with messages
+            sql: SQL query of the message to update
+            status: 'like', 'dislike', or None to clear
         """
-        # Get conversation metadata
+        await history_db.execute(
+            """
+            UPDATE conversation_messages SET feedback = ?
+            WHERE id = (
+                SELECT id FROM conversation_messages
+                WHERE conversation_id = ? AND sql = ? AND role = 'assistant'
+                ORDER BY id DESC LIMIT 1
+            )
+            """,
+            (status, conversation_id, sql)
+        )
+
+    async def get_liked_messages(
+        self,
+        limit: int = 100,
+        exclude_conversation_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get liked assistant messages for few-shot similarity search.
+
+        JOINs with the preceding user message to get the original question.
+
+        Args:
+            limit: Maximum number of records to return
+            exclude_conversation_id: Exclude messages from this conversation
+
+        Returns:
+            List of {question, sql, intent, timestamp}
+        """
+        base_query = """
+            SELECT a.sql, a.timestamp, u.content AS question
+            FROM conversation_messages a
+            JOIN conversation_messages u ON (
+                u.id = (
+                    SELECT MAX(id) FROM conversation_messages
+                    WHERE conversation_id = a.conversation_id
+                      AND role = 'user'
+                      AND id < a.id
+                )
+            )
+            WHERE a.feedback = 'like'
+              AND a.sql IS NOT NULL
+              AND a.role = 'assistant'
+        """
+
+        params = []
+        if exclude_conversation_id:
+            base_query += " AND a.conversation_id != ?"
+            params.append(exclude_conversation_id)
+
+        base_query += " ORDER BY a.id DESC LIMIT ?"
+        params.append(limit)
+
+        rows = await history_db.fetchall(base_query, tuple(params))
+
+        return [
+            {
+                "question": row["question"],
+                "sql": row["sql"],
+                "intent": None,
+                "timestamp": row["timestamp"],
+            }
+            for row in rows
+        ]
+
+    async def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get full conversation details."""
         conv_row = await history_db.fetchone(
             "SELECT id, created_at, updated_at, user_id FROM conversations WHERE id = ?",
             (conversation_id,)
         )
-        
+
         if not conv_row:
             return None
-        
-        # Get messages
+
         messages = await self.get_conversation_messages(conversation_id)
 
         title = "New Conversation"
@@ -234,7 +280,7 @@ class HistoryManager:
                 content = message["content"]
                 title = content[:50] + ("..." if len(content) > 50 else "")
                 break
-        
+
         return {
             "id": conv_row["id"],
             "title": title,
@@ -243,16 +289,9 @@ class HistoryManager:
             "user_id": conv_row["user_id"],
             "messages": messages
         }
-    
+
     async def get_all_conversations(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get all conversations with summary info.
-        
-        Args:
-            limit: Maximum number of conversations to return (sorted by recent first)
-            
-        Returns:
-            List of conversations with id, created_at, updated_at, and first message as preview
-        """
+        """Get all conversations with summary info."""
         rows = await history_db.fetchall(
             """
             SELECT id, created_at, updated_at, user_id
@@ -262,10 +301,9 @@ class HistoryManager:
             """,
             (limit,)
         )
-        
+
         conversations = []
         for row in rows:
-            # Get first message for preview/title
             first_message = await history_db.fetchone(
                 """
                 SELECT content FROM conversation_messages
@@ -275,22 +313,21 @@ class HistoryManager:
                 """,
                 (row["id"],)
             )
-            
+
             title = "New Conversation"
             if first_message:
                 content = first_message["content"]
-                # Truncate to first 50 chars for title
                 title = content[:50] + ("..." if len(content) > 50 else "")
-            
+
             conversations.append({
                 "id": row["id"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
                 "title": title
             })
-        
+
         return conversations
-    
+
     async def save_query(
         self,
         conversation_id: str,
@@ -300,64 +337,15 @@ class HistoryManager:
         execution_result: Optional[str] = None,
         success: bool = True
     ):
-        """Save a query to query history (for few-shot learning).
-        
-        Args:
-            conversation_id: Conversation UUID
-            question: User's question
-            generated_sql: Generated SQL query
-            intent: Detected intent
-            execution_result: JSON string of execution result
-            success: Whether query executed successfully
-        """
+        """Save a query to query history."""
         await history_db.execute(
             """
-            INSERT INTO query_history 
+            INSERT INTO query_history
             (conversation_id, question, intent, generated_sql, execution_result, success)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (conversation_id, question, intent, generated_sql, execution_result, success)
         )
-    
-    async def get_successful_queries(
-        self,
-        limit: int = 100,
-        exclude_conversation_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Get successful queries for similarity search.
-        
-        Args:
-            limit: Maximum number of queries to return
-            exclude_conversation_id: Exclude queries from this conversation
-            
-        Returns:
-            List of successful query records
-        """
-        query = """
-            SELECT question, intent, generated_sql, timestamp
-            FROM query_history
-            WHERE success = 1
-        """
-        
-        params = []
-        if exclude_conversation_id:
-            query += " AND conversation_id != ?"
-            params.append(exclude_conversation_id)
-        
-        query += " ORDER BY timestamp DESC LIMIT ?"
-        params.append(limit)
-        
-        rows = await history_db.fetchall(query, tuple(params))
-        
-        return [
-            {
-                "question": row["question"],
-                "intent": row["intent"],
-                "sql": row["generated_sql"],
-                "timestamp": row["timestamp"]
-            }
-            for row in rows
-        ]
 
 
 # Global history manager instance

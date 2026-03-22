@@ -1,7 +1,10 @@
 import { Avatar } from '../ui/Avatar';
-import { AlertCircle, Database } from 'lucide-react';
+import { AlertCircle, Database, ThumbsUp, ThumbsDown } from 'lucide-react';
 import type { Message } from '../../types/chat';
 import { SQLCodeBlock } from '../sql/SQLCodeBlock';
+import { useChatStore } from '../../stores/useChatStore';
+import { api } from '../../services/api';
+import { cn } from '../../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -10,6 +13,25 @@ interface AssistantMessageProps {
 }
 
 export const AssistantMessage = ({ message }: AssistantMessageProps) => {
+  const { setMessageFeedback, activeConversationId } = useChatStore();
+
+  const handleFeedback = async (status: 'like' | 'dislike') => {
+    if (!message.sql || !activeConversationId) return;
+
+    // Toggle off if clicking the active status
+    const next = message.feedback === status ? null : status;
+
+    setMessageFeedback(message.id, next);
+
+    try {
+      await api.submitFeedback(message.sql, next ?? 'none', activeConversationId);
+    } catch (e) {
+      console.error('Failed to submit feedback:', e);
+      // Revert optimistic update on failure
+      setMessageFeedback(message.id, message.feedback ?? null);
+    }
+  };
+
   return (
     <div className="flex gap-3 justify-start">
       <Avatar fallback="AI" size="sm" className="bg-accent" />
@@ -65,6 +87,36 @@ export const AssistantMessage = ({ message }: AssistantMessageProps) => {
             >
               {message.content}
             </ReactMarkdown>
+
+            {/* Like / Dislike — only for messages with SQL */}
+            {message.sql && (
+              <div className="flex gap-2 justify-end mt-3 pt-2 border-t border-default">
+                <button
+                  onClick={() => handleFeedback('like')}
+                  title="Good response"
+                  className={cn(
+                    'p-1.5 rounded transition-colors',
+                    message.feedback === 'like'
+                      ? 'text-green-500 bg-green-500/10'
+                      : 'text-muted hover:text-green-500 hover:bg-green-500/10'
+                  )}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleFeedback('dislike')}
+                  title="Bad response"
+                  className={cn(
+                    'p-1.5 rounded transition-colors',
+                    message.feedback === 'dislike'
+                      ? 'text-red-500 bg-red-500/10'
+                      : 'text-muted hover:text-red-500 hover:bg-red-500/10'
+                  )}
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
