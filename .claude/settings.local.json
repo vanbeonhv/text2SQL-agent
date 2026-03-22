@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -E \"\\\\.\\(sh|py|txt|md|json\\)$\")",
-      "Bash(python data/seed_data.py)"
+      "Bash(python data/seed_data.py)",
+      "Bash(pnpm add:*)"
     ]
   }
 }

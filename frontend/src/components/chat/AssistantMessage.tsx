@@ -1,7 +1,9 @@
 import { Avatar } from '../ui/Avatar';
-import { Database, AlertCircle } from 'lucide-react';
+import { AlertCircle, Database } from 'lucide-react';
 import type { Message } from '../../types/chat';
 import { SQLCodeBlock } from '../sql/SQLCodeBlock';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface AssistantMessageProps {
   message: Message;
@@ -12,10 +14,57 @@ export const AssistantMessage = ({ message }: AssistantMessageProps) => {
     <div className="flex gap-3 justify-start">
       <Avatar fallback="AI" size="sm" className="bg-accent" />
       <div className="max-w-[80%] space-y-3">
-        {/* Main content */}
+        {/* Main content — rendered as markdown */}
         {message.content && (
-          <div className="surface elevated rounded-lg px-4 py-3">
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          <div className="surface elevated rounded-lg px-4 py-3 text-sm">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ children }) => (
+                  <div className="overflow-x-auto my-2">
+                    <table className="w-full text-xs border-collapse">{children}</table>
+                  </div>
+                ),
+                thead: ({ children }) => (
+                  <thead className="bg-light-elevated dark:bg-dark-elevated">{children}</thead>
+                ),
+                th: ({ children }) => (
+                  <th className="px-3 py-2 text-left font-medium border border-default">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="px-3 py-2 border border-default">{children}</td>
+                ),
+                code: ({ children }) => (
+                  <code className="bg-light-elevated dark:bg-dark-elevated px-1 rounded text-xs font-mono">
+                    {children}
+                  </code>
+                ),
+                pre: ({ children }) => (
+                  <pre className="bg-light-elevated dark:bg-dark-elevated p-3 rounded-lg overflow-x-auto my-2 text-xs font-mono">
+                    {children}
+                  </pre>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0">{children}</p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="font-semibold text-sm mt-3 mb-1">{children}</h3>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
         )}
 
@@ -30,54 +79,11 @@ export const AssistantMessage = ({ message }: AssistantMessageProps) => {
           </div>
         )}
 
-        {/* Results Table Preview */}
-        {message.results && message.results.rows.length > 0 && (
-          <div className="surface elevated rounded-lg overflow-hidden border border-default">
-            <div className="px-4 py-2 border-b border-default bg-light-elevated dark:bg-dark-elevated">
-              <span className="text-xs font-medium">
-                Results ({message.results.count} rows)
-              </span>
-            </div>
-            <div className="overflow-x-auto max-h-64">
-              <table className="w-full text-xs">
-                <thead className="bg-light-elevated dark:bg-dark-elevated sticky top-0">
-                  <tr>
-                    {message.results.columns?.map((col) => (
-                      <th key={col} className="px-3 py-2 text-left font-medium border-b border-default">
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {message.results.rows.slice(0, 10).map((row, idx) => (
-                    <tr key={idx} className="hover:bg-light-elevated dark:hover:bg-dark-elevated">
-                      {message.results?.columns?.map((col) => (
-                        <td key={col} className="px-3 py-2 border-b border-default">
-                          {row[col] !== null && row[col] !== undefined 
-                            ? String(row[col]) 
-                            : <span className="text-muted italic">null</span>
-                          }
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {message.results.count > 10 && (
-              <div className="px-4 py-2 border-t border-default bg-light-elevated dark:bg-dark-elevated text-xs text-muted text-center">
-                Showing 10 of {message.results.count} rows
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Error */}
         {message.error && (
           <div className="surface elevated rounded-lg px-4 py-3 border border-error bg-error/10">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-error">Error</p>
                 <p className="text-xs text-muted mt-1">{message.error}</p>
