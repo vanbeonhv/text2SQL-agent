@@ -84,11 +84,11 @@ export const ChatArea = () => {
       {/* Messages area */}
       <div className="relative flex-1 overflow-y-auto px-4 py-6 min-h-0">
         {/* Loading overlay */}
-        {isStreaming && (
+        {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-[#0A0A0F]/60 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3 rounded-xl border border-[#E9D5FF] dark:border-[#2D2D3A] bg-white dark:bg-[#1A1A24] px-8 py-6 shadow-lg">
               <Loader2 className="h-8 w-8 animate-spin text-purple-500 dark:text-purple-400" />
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Generating SQL...</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Loading...</p>
             </div>
           </div>
         )}

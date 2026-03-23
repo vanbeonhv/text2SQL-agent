@@ -1,4 +1,5 @@
 """Response formatting tools - LLM-based full markdown generation."""
+
 from typing import Dict, Any
 from ..services.llm_gateway.factory import LLMProviderFactory
 
@@ -10,11 +11,7 @@ class LLMSummarizer:
         self.llm = LLMProviderFactory.get_provider(model_tier="lightweight")
 
     async def generate_insight(
-        self,
-        question: str,
-        sql: str,
-        result: Dict[str, Any],
-        intent: str = "unknown"
+        self, question: str, sql: str, result: Dict[str, Any], intent: str = "unknown"
     ) -> str:
         """Generate a full markdown response: answer + table + insights.
 
@@ -64,9 +61,7 @@ Rules:
 
         try:
             markdown = await self.llm.generate(
-                prompt=prompt,
-                temperature=0.3,
-                max_tokens=800
+                prompt=prompt, temperature=0.3, max_tokens=4000
             )
             return markdown.strip()
         except Exception as e:
@@ -102,7 +97,9 @@ class ResponseFormatter:
                 "format_method": "llm"
             }
         """
-        markdown = await self.llm_summarizer.generate_insight(question, sql, result, intent)
+        markdown = await self.llm_summarizer.generate_insight(
+            question, sql, result, intent
+        )
 
         if not markdown:
             markdown = f"Query returned {result.get('count', 0)} row(s)."
