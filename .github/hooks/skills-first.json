@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/skills_first_hook.py",
+        "windows": "py .github\\hooks\\scripts\\skills_first_hook.py",
+        "timeout": 5
+      }
+    ]
+  }
+}
