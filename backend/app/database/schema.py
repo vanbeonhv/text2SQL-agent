@@ -1,7 +1,8 @@
 """Database schema management."""
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 from ..config import settings
+from .connection import target_db
 
 
 class SchemaManager:
@@ -24,14 +25,8 @@ class SchemaManager:
         
         return self._schema_cache
     
-    def get_schema_as_text(self) -> str:
-        """Get schema as formatted text for LLM prompts.
-
-        Returns:
-            Human-readable schema description including business context
-        """
-        schema = self.load_schema()
-
+    def format_schema_as_text(self, schema: Dict[str, Any]) -> str:
+        """Format any schema dict as text for LLM prompts."""
         text = "Database Schema:\n\n"
 
         # Add tables
@@ -72,6 +67,11 @@ class SchemaManager:
                 text += f"{label}:\n{value}\n\n"
 
         return text
+
+    def get_schema_as_text(self) -> str:
+        """Get default schema file as formatted text for LLM prompts."""
+        schema = self.load_schema()
+        return self.format_schema_as_text(schema)
     
     def clear_cache(self):
         """Clear schema cache (useful for tests)."""
@@ -80,3 +80,37 @@ class SchemaManager:
 
 # Global schema manager instance
 schema_manager = SchemaManager()
+
+
+async def introspect_target_database_schema() -> Dict[str, Any]:
+    """Build schema JSON dynamically from current target SQLite database."""
+    table_rows = await target_db.fetchall(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name NOT LIKE 'sqlite_%'
+        ORDER BY name
+        """
+    )
+
+    tables: List[Dict[str, Any]] = []
+    for row in table_rows:
+        table_name = row["name"]
+        columns_info = await target_db.fetchall(f"PRAGMA table_info({table_name})")
+        columns: List[Dict[str, Any]] = []
+        for col in columns_info:
+            columns.append(
+                {
+                    "name": col["name"],
+                    "type": col["type"] or "TEXT",
+                    "primary_key": bool(col["pk"]),
+                }
+            )
+        tables.append({"name": table_name, "columns": columns})
+
+    return {
+        "tables": tables,
+        "relationships": [],
+        "business_context": {},
+    }

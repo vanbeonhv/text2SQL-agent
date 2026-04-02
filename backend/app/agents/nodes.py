@@ -41,23 +41,73 @@ async def analyze_intent_node(state: AgentState) -> AgentState:
     )
     
     state["intent"] = result.get("intent", "unknown")
-    
+    state["intent_details"] = result.get("details", {}) or {}
+
+    # Detect target tables for data intents only (intent routing uses FAST_PATH_INTENTS).
+    # For non-data intents, schema will be built from all active registry tables (fallback) in retrieve_schema_node.
+    if state["intent"] not in FAST_PATH_INTENTS:
+        detection = await intent_analyzer.detect_target_tables(
+            question=state["question"],
+            active_only=True,
+            allow_llm_fallback=True,
+        )
+        state["target_tables"] = detection.get("target_tables", []) or []
+        # Keep detection metadata attached for downstream/use in the response formatter.
+        state["intent_details"] = {
+            **state.get("intent_details", {}),
+            "table_detection": detection,
+        }
+
     return state
 
 
 async def retrieve_schema_node(state: AgentState) -> AgentState:
     """Retrieve database schema."""
     state["current_stage"] = "retrieving_schema"
-    
-    # Load schema as text for LLM
-    schema_text = schema_manager.get_schema_as_text()
-    schema_dict = schema_manager.load_schema()
-    
-    state["schema"] = {
-        "text": schema_text,
-        "dict": schema_dict
-    }
-    
+
+    target_tables = state.get("target_tables") or []
+
+    schema_dict = None
+    schema_text = None
+    schema_source = "default"
+
+    # 1) Build from registry: either selected target_tables or all active definitions.
+    registry_defs = []
+    if target_tables:
+        for tn in target_tables:
+            td = await history_manager.get_table_definition(tn)
+            if td and td.get("is_active", False):
+                registry_defs.append(td)
+    else:
+        registry_defs = await history_manager.list_table_definitions(active_only=True)
+
+    if registry_defs:
+        schema_source = "registry"
+        schema_dict = {
+            "tables": [
+                {
+                    "name": td["table_name"],
+                    "columns": td.get("columns", []) or [],
+                }
+                for td in registry_defs
+            ],
+            "relationships": [
+                r
+                for td in registry_defs
+                for r in (td.get("relationships", []) or [])
+            ],
+            "business_context": {},
+        }
+        schema_text = schema_manager.format_schema_as_text(schema_dict)
+
+    # 2) Fallback to default schema file if registry is empty.
+    if schema_dict is None:
+        schema_source = "default"
+        schema_dict = schema_manager.load_schema()
+        schema_text = schema_manager.get_schema_as_text()
+
+    state["schema"] = {"text": schema_text, "dict": schema_dict}
+    state["schema_source"] = schema_source
     return state
 
 
@@ -70,7 +120,7 @@ def is_data_intent(state: AgentState) -> str:
     return "data"
 
 
-async def fast_response_node(state: AgentState) -> AgentState:
+def fast_response_node(state: AgentState) -> AgentState:
     """Build and store a fast response for non-data intents (no SQL)."""
     state["current_stage"] = "fast_response"
     schema_dict = state.get("schema", {}).get("dict") if state.get("schema") else None
@@ -131,7 +181,7 @@ async def generate_sql_node(state: AgentState) -> AgentState:
     return state
 
 
-async def validate_sql_node(state: AgentState) -> AgentState:
+def validate_sql_node(state: AgentState) -> AgentState:
     """Validate SQL query for safety."""
     state["current_stage"] = "validating_sql"
     

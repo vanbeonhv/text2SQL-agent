@@ -6,6 +6,20 @@ interface SchemaTreeProps {
   schema: SchemaEvent;
 }
 
+type SchemaTableLike = {
+  name?: string;
+  table_name?: string;
+  columns?: Array<Record<string, unknown>>;
+};
+
+type SchemaColumnLike = {
+  name?: string;
+  column_name?: string;
+  type?: string;
+  data_type?: string;
+  primary_key?: boolean;
+};
+
 export const SchemaTree = ({ schema }: SchemaTreeProps) => {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
 
@@ -27,9 +41,10 @@ export const SchemaTree = ({ schema }: SchemaTreeProps) => {
       </div>
 
       <div className="space-y-2">
-        {schema.tables.map((table: any, idx: number) => {
-          const tableName = table.name || table.table_name || `Table ${idx + 1}`;
-          const columns = table.columns || [];
+        {schema.tables.map((table, idx: number) => {
+          const t = table as SchemaTableLike;
+          const tableName = t.name || t.table_name || `Table ${idx + 1}`;
+          const columns = t.columns || [];
           const isExpanded = expandedTables.has(tableName);
 
           return (
@@ -53,25 +68,30 @@ export const SchemaTree = ({ schema }: SchemaTreeProps) => {
               {isExpanded && columns.length > 0 && (
                 <div className="border-t border-default bg-light-elevated/50 dark:bg-dark-elevated/50">
                   <div className="px-3 py-2 space-y-1">
-                    {columns.map((col: any, colIdx: number) => (
+                    {columns.map((col, colIdx: number) => {
+                      const c = col as SchemaColumnLike;
+                      const colName = c.name || c.column_name || `col_${colIdx + 1}`;
+                      const colType = c.type || c.data_type || '';
+                      return (
                       <div
                         key={colIdx}
                         className="flex items-center gap-2 text-xs py-1"
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                         <span className="font-code font-medium">
-                          {col.name || col.column_name}
+                          {colName}
                         </span>
                         <span className="text-muted">
-                          {col.type || col.data_type}
+                          {colType}
                         </span>
-                        {col.primary_key && (
+                        {c.primary_key && (
                           <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">
                             PK
                           </span>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

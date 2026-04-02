@@ -6,12 +6,12 @@ export interface Message {
   sql?: string;
   results?: QueryResult;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   feedback?: 'like' | 'dislike' | null;
 }
 
 export interface QueryResult {
-  rows: Array<Record<string, any>>;
+  rows: Array<Record<string, unknown>>;
   count: number;
   columns?: string[];
 }

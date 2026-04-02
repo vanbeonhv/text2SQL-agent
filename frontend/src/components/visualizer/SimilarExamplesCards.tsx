@@ -15,20 +15,31 @@ export const SimilarExamplesCards = ({ examples }: SimilarExamplesCardsProps) =>
       </div>
 
       <div className="space-y-2">
-        {examples.examples.slice(0, 3).map((example: any, idx: number) => (
+        {examples.examples.slice(0, 3).map((example, idx: number) => {
+          const ex = example as Record<string, unknown>;
+          const question = typeof ex.question === 'string' ? ex.question : 'Question';
+          const sql =
+            typeof ex.sql === 'string'
+              ? ex.sql
+              : typeof ex.query === 'string'
+              ? ex.query
+              : 'SELECT ...';
+
+          return (
           <div
             key={idx}
             className="p-3 rounded-lg border border-default hover:border-primary/50 transition-colors"
           >
-            <p className="text-xs text-muted mb-2">{example.question || 'Question'}</p>
+            <p className="text-xs text-muted mb-2">{question}</p>
             <div className="flex items-start gap-2">
               <Code className="w-3 h-3 text-accent mt-0.5 flex-shrink-0" />
               <code className="text-xs font-code text-accent break-all">
-                {example.sql || example.query || 'SELECT ...'}
+                {sql}
               </code>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

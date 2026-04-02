@@ -11,17 +11,17 @@ export interface ConversationIdEvent {
 
 export interface IntentEvent {
   intent: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface SchemaEvent {
-  tables: Array<Record<string, any>>;
-  relationships?: Array<Record<string, any>>;
+  tables: Array<Record<string, unknown>>;
+  relationships?: Array<Record<string, unknown>>;
 }
 
 export interface SimilarExamplesEvent {
   count: number;
-  examples: Array<Record<string, any>>;
+  examples: Array<Record<string, unknown>>;
 }
 
 export interface SQLEvent {
@@ -35,7 +35,7 @@ export interface ValidationEvent {
 }
 
 export interface ResultEvent {
-  rows: Array<Record<string, any>>;
+  rows: Array<Record<string, unknown>>;
   count: number;
   columns?: string[];
 }

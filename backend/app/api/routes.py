@@ -2,7 +2,7 @@
 import json
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 from ..models.schemas import (
     ChatRequest,
     ConversationResponse,
@@ -11,6 +11,10 @@ from ..models.schemas import (
     HealthResponse,
     FeedbackRequest,
     FeedbackResponse,
+    SchemaTableDefinitionRequest,
+    SchemaTableDefinitionResponse,
+    SchemaDetectRequest,
+    SchemaDetectResponse,
 )
 from ..models.events import (
     StageEvent,
@@ -29,6 +33,7 @@ from ..models.events import (
 from ..agents.graph import agent_graph
 from ..services.conversation import conversation_service
 from ..database.history import history_manager
+from ..tools.intent_analyzer import intent_analyzer
 from ..constants import STAGE_MESSAGES, STAGE_ICONS
 
 
@@ -321,3 +326,104 @@ async def health_check():
         status="ok",
         version="1.0.0"
     )
+
+
+@router.post(
+    "/schema/tables",
+    response_model=SchemaTableDefinitionResponse,
+    status_code=201,
+)
+async def upsert_schema_table_definition(
+    request: SchemaTableDefinitionRequest,
+):
+    """Create or update a table-level schema definition."""
+    await history_manager.upsert_table_definition(
+        table_name=request.table_name,
+        columns=request.columns,
+        relationships=request.relationships,
+        description=request.description,
+        tags=request.tags,
+        is_active=request.is_active if request.is_active is not None else True,
+    )
+    table_def = await history_manager.get_table_definition(request.table_name)
+    if not table_def:
+        # Should never happen unless DB inconsistency occurs
+        raise HTTPException(status_code=500, detail="Failed to persist table definition")
+    return table_def
+
+
+@router.get(
+    "/schema/tables",
+    response_model=List[SchemaTableDefinitionResponse],
+)
+async def list_schema_table_definitions(
+    active_only: bool = True,
+):
+    """List registered table definitions (optionally only active)."""
+    return await history_manager.list_table_definitions(active_only=active_only)
+
+
+@router.get(
+    "/schema/tables/{table_name}",
+    response_model=SchemaTableDefinitionResponse,
+)
+async def get_schema_table_definition(table_name: str):
+    """Get a specific table definition by name."""
+    table_def = await history_manager.get_table_definition(table_name)
+    if not table_def:
+        raise HTTPException(status_code=404, detail="Table definition not found")
+    return table_def
+
+
+@router.put(
+    "/schema/tables/{table_name}",
+    response_model=SchemaTableDefinitionResponse,
+)
+async def update_schema_table_definition(
+    table_name: str,
+    request: SchemaTableDefinitionRequest,
+):
+    """Update a specific table definition."""
+    if request.table_name != table_name:
+        raise HTTPException(status_code=400, detail="table_name mismatch between path and body")
+
+    await history_manager.upsert_table_definition(
+        table_name=table_name,
+        columns=request.columns,
+        relationships=request.relationships,
+        description=request.description,
+        tags=request.tags,
+        is_active=request.is_active if request.is_active is not None else True,
+    )
+    table_def = await history_manager.get_table_definition(table_name)
+    if not table_def:
+        raise HTTPException(status_code=500, detail="Failed to load updated table definition")
+    return table_def
+
+
+@router.delete(
+    "/schema/tables/{table_name}",
+    status_code=204,
+)
+async def delete_schema_table_definition(table_name: str):
+    """Soft-delete a table definition (set is_active=0)."""
+    existing = await history_manager.get_table_definition(table_name)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Table definition not found")
+
+    await history_manager.delete_table_definition(table_name=table_name)
+    return None
+
+
+@router.post(
+    "/schema/detect",
+    response_model=SchemaDetectResponse,
+)
+async def detect_schema_tables(request: SchemaDetectRequest):
+    """Detect relevant registered tables for the question (heuristic + LLM fallback)."""
+    result = await intent_analyzer.detect_target_tables(
+        question=request.question,
+        active_only=request.active_only,
+        allow_llm_fallback=request.allow_llm_fallback,
+    )
+    return result

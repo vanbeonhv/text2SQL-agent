@@ -14,7 +14,7 @@ interface UseConversationsResult {
   isLoading: boolean;
   error: Error | null;
   isError: boolean;
-  refetch: () => Promise<any>;
+  refetch: () => Promise<unknown>;
 }
 
 export const useConversation = (id: string | null): UseConversationResult => {

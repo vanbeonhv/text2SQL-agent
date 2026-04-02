@@ -117,7 +117,7 @@ export const useProcessStore = create<ProcessStore>((set) => ({
         updates.results = event.data;
         break;
         
-      case 'error':
+      case 'error': {
         updates.error = event.data;
         // Mark current stage as error
         const newStages = [...state.stages];
@@ -129,8 +129,9 @@ export const useProcessStore = create<ProcessStore>((set) => ({
         }
         updates.stages = newStages;
         break;
+      }
         
-      case 'complete':
+      case 'complete': {
         updates.isComplete = true;
         // Mark all stages as completed
         const completedStages = state.stages.map(s => ({
@@ -139,6 +140,7 @@ export const useProcessStore = create<ProcessStore>((set) => ({
         }));
         updates.stages = completedStages;
         break;
+      }
     }
     
     return { ...updates };

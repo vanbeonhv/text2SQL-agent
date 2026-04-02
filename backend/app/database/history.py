@@ -37,7 +37,8 @@ class HistoryManager:
                 id TEXT PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                user_id TEXT
+                user_id TEXT,
+                schema_json TEXT
             )
         """)
 
@@ -72,6 +73,21 @@ class HistoryManager:
             )
         """)
 
+        # Create schema_table_definitions table for flexible table-level schemas
+        await history_db.execute("""
+            CREATE TABLE IF NOT EXISTS schema_table_definitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_name TEXT NOT NULL UNIQUE,
+                columns_json TEXT NOT NULL,
+                relationships_json TEXT,
+                description TEXT,
+                tags_json TEXT,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Create indexes
         await history_db.execute("""
             CREATE INDEX IF NOT EXISTS idx_conv_messages
@@ -88,11 +104,22 @@ class HistoryManager:
             ON query_history(success)
         """)
 
+        await history_db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_schema_table_active
+            ON schema_table_definitions(is_active)
+        """)
+
         # Add feedback column to conversation_messages if missing (non-destructive migration)
         existing_msg_cols = await self._get_table_columns("conversation_messages")
         if "feedback" not in existing_msg_cols:
             await history_db.execute(
                 "ALTER TABLE conversation_messages ADD COLUMN feedback TEXT"
+            )
+
+        existing_conv_cols = await self._get_table_columns("conversations")
+        if "schema_json" not in existing_conv_cols:
+            await history_db.execute(
+                "ALTER TABLE conversations ADD COLUMN schema_json TEXT"
             )
 
     async def reset_database(self):
@@ -182,6 +209,116 @@ class HistoryManager:
             })
 
         return messages
+
+    async def upsert_table_definition(
+        self,
+        table_name: str,
+        columns: List[Dict[str, Any]],
+        relationships: Optional[List[Dict[str, Any]]] = None,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        is_active: bool = True,
+    ):
+        """Create or update a table-level schema definition in history DB."""
+        columns_json = json.dumps(columns)
+        relationships_json = json.dumps(relationships or [])
+        tags_json = json.dumps(tags or [])
+
+        await history_db.execute(
+            """
+            INSERT INTO schema_table_definitions
+                (table_name, columns_json, relationships_json, description, tags_json, is_active)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(table_name) DO UPDATE SET
+                columns_json = excluded.columns_json,
+                relationships_json = excluded.relationships_json,
+                description = excluded.description,
+                tags_json = excluded.tags_json,
+                is_active = excluded.is_active,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (table_name, columns_json, relationships_json, description, tags_json, int(is_active)),
+        )
+
+    async def get_table_definition(
+        self,
+        table_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch a table-level schema definition from history DB."""
+        row = await history_db.fetchone(
+            """
+            SELECT table_name, columns_json, relationships_json, description, tags_json, is_active
+            FROM schema_table_definitions
+            WHERE table_name = ?
+            """,
+            (table_name,),
+        )
+        if not row:
+            return None
+
+        return {
+            "table_name": row["table_name"],
+            "columns": json.loads(row["columns_json"]) if row["columns_json"] else [],
+            "relationships": json.loads(row["relationships_json"]) if row["relationships_json"] else [],
+            "description": row["description"],
+            "tags": json.loads(row["tags_json"]) if row["tags_json"] else [],
+            "is_active": bool(row["is_active"]),
+        }
+
+    async def list_table_definitions(
+        self,
+        active_only: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """List table-level schema definitions (optionally only active)."""
+        query = """
+            SELECT table_name, columns_json, relationships_json, description, tags_json, is_active
+            FROM schema_table_definitions
+        """
+        params: list[Any] = []
+        if active_only:
+            query += " WHERE is_active = 1"
+
+        query += " ORDER BY table_name ASC"
+
+        rows = await history_db.fetchall(query, tuple(params))
+        return [
+            {
+                "table_name": r["table_name"],
+                "columns": json.loads(r["columns_json"]) if r["columns_json"] else [],
+                "relationships": json.loads(r["relationships_json"]) if r["relationships_json"] else [],
+                "description": r["description"],
+                "tags": json.loads(r["tags_json"]) if r["tags_json"] else [],
+                "is_active": bool(r["is_active"]),
+            }
+            for r in rows
+        ]
+
+    async def set_table_definition_active(
+        self,
+        table_name: str,
+        is_active: bool,
+    ) -> bool:
+        """Soft activate/deactivate a table definition."""
+        cur = await history_db.execute(
+            """
+            UPDATE schema_table_definitions
+            SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE table_name = ?
+            """,
+            (int(is_active), table_name),
+        )
+        # aiosqlite cursor has rowcount; but DatabaseManager.execute returns cursor.
+        return getattr(cur, "rowcount", 0) > 0
+
+    async def delete_table_definition(
+        self,
+        table_name: str,
+    ) -> bool:
+        """Soft-delete a table definition (sets is_active = 0)."""
+        return await self.set_table_definition_active(
+            table_name=table_name,
+            is_active=False,
+        )
 
     async def set_message_feedback(
         self,
@@ -287,6 +424,7 @@ class HistoryManager:
             "created_at": conv_row["created_at"],
             "updated_at": conv_row["updated_at"],
             "user_id": conv_row["user_id"],
+            "schema": await self.get_conversation_schema(conversation_id),
             "messages": messages
         }
 
@@ -346,6 +484,38 @@ class HistoryManager:
             """,
             (conversation_id, question, intent, generated_sql, execution_result, success)
         )
+
+    async def set_conversation_schema(self, conversation_id: str, schema: Dict[str, Any]):
+        """Persist custom schema JSON for a conversation."""
+        await history_db.execute(
+            """
+            UPDATE conversations
+            SET schema_json = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (json.dumps(schema), conversation_id),
+        )
+
+    async def clear_conversation_schema(self, conversation_id: str):
+        """Clear custom schema for a conversation (fallback to default file schema)."""
+        await history_db.execute(
+            """
+            UPDATE conversations
+            SET schema_json = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (conversation_id,),
+        )
+
+    async def get_conversation_schema(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get custom schema JSON for conversation if configured."""
+        row = await history_db.fetchone(
+            "SELECT schema_json FROM conversations WHERE id = ?",
+            (conversation_id,),
+        )
+        if not row or not row["schema_json"]:
+            return None
+        return json.loads(row["schema_json"])
 
 
 # Global history manager instance

@@ -129,6 +129,21 @@ class ConversationService:
         """
         return await history_manager.get_all_conversations(limit)
 
+    async def get_conversation_schema(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get custom schema JSON for a conversation."""
+        return await history_manager.get_conversation_schema(conversation_id)
+
+    async def set_conversation_schema(self, conversation_id: str, schema: Dict[str, Any]):
+        """Set custom schema JSON for a conversation."""
+        exists = await history_manager.conversation_exists(conversation_id)
+        if not exists:
+            await history_manager.create_conversation(conversation_id)
+        await history_manager.set_conversation_schema(conversation_id, schema)
+
+    async def clear_conversation_schema(self, conversation_id: str):
+        """Clear custom schema for a conversation."""
+        await history_manager.clear_conversation_schema(conversation_id)
+
 
 # Global conversation service instance
 conversation_service = ConversationService()

@@ -8,6 +8,10 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
     question: str = Field(..., description="User's natural language question")
     conversation_id: Optional[str] = Field(None, description="Existing conversation ID (creates new if not provided)")
+    schema: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional runtime schema JSON to use and persist for this conversation",
+    )
 
 
 class QueryResult(BaseModel):
@@ -38,6 +42,7 @@ class ConversationResponse(BaseModel):
     title: str = Field(..., description="Conversation title")
     created_at: datetime = Field(..., description="Conversation creation time")
     updated_at: datetime = Field(..., description="Last update time")
+    schema: Optional[Dict[str, Any]] = Field(None, description="Conversation-level custom schema JSON")
     messages: List[ConversationMessage] = Field(..., description="List of messages in conversation")
 
 
@@ -92,3 +97,56 @@ class FeedbackResponse(BaseModel):
     """Response model for feedback submission."""
     status: str = Field(..., description="Saved feedback status")
     message: str = Field(..., description="Confirmation message")
+
+
+class ConversationSchemaRequest(BaseModel):
+    """Set/update conversation schema request."""
+    schema: Dict[str, Any] = Field(..., description="Schema JSON with tables/columns/relationships")
+
+
+class ConversationSchemaResponse(BaseModel):
+    """Conversation schema response payload."""
+    conversation_id: str = Field(..., description="Conversation ID")
+    schema: Optional[Dict[str, Any]] = Field(None, description="Schema JSON if configured")
+    source: str = Field(..., description="Schema source: conversation|default|introspected")
+
+
+class SchemaTableDefinitionRequest(BaseModel):
+    """Request body for creating/updating a table-level schema definition."""
+    table_name: str = Field(..., description="Logical table name")
+    columns: List[Dict[str, Any]] = Field(..., description="Column definitions")
+    relationships: Optional[List[Dict[str, Any]]] = Field(
+        default_factory=list,
+        description="Relationship definitions (from/to/etc.)",
+    )
+    description: Optional[str] = Field(None, description="Human-friendly table description")
+    tags: List[str] = Field(default_factory=list, description="Optional tags for matching")
+    is_active: Optional[bool] = Field(True, description="Whether this table definition is active")
+
+
+class SchemaTableDefinitionResponse(BaseModel):
+    """Response payload for a table-level schema definition."""
+    table_name: str
+    columns: List[Dict[str, Any]]
+    relationships: List[Dict[str, Any]]
+    description: Optional[str]
+    tags: List[str]
+    is_active: bool
+
+
+class SchemaDetectRequest(BaseModel):
+    """Request for detecting relevant tables for a question."""
+    question: str = Field(..., description="User question / intent")
+    active_only: bool = Field(True, description="Only consider active schema table definitions")
+    allow_llm_fallback: bool = Field(
+        True,
+        description="Allow calling LLM if heuristic confidence is low (requires provider API key).",
+    )
+
+
+class SchemaDetectResponse(BaseModel):
+    """Response payload for schema detection."""
+    target_tables: List[str]
+    confidence: float
+    strategy: Literal["heuristic", "llm_fallback"]
+    matched_reasons: List[str]

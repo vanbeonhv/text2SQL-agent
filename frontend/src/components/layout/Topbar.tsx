@@ -4,6 +4,8 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 import { IconButton } from '../ui/IconButton';
 import { useSidebarStore } from '../../stores/useSidebarStore';
 import { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
+import { cn } from '../../lib/utils';
 
 export const Topbar = () => {
   const { setLeftExpanded, setRightExpanded } = useSidebarStore();
@@ -35,6 +37,32 @@ export const Topbar = () => {
       </div>
       
       <div className="flex items-center gap-2 md:gap-4">
+        <nav className="hidden md:flex items-center gap-1">
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              cn(
+                'px-3 py-1.5 rounded-lg text-sm transition-colors',
+                'hover:bg-light-elevated dark:hover:bg-dark-elevated',
+                isActive && 'bg-light-elevated dark:bg-dark-elevated text-primary font-medium'
+              )
+            }
+          >
+            Chat
+          </NavLink>
+          <NavLink
+            to="/admin/schema-tables"
+            className={({ isActive }) =>
+              cn(
+                'px-3 py-1.5 rounded-lg text-sm transition-colors',
+                'hover:bg-light-elevated dark:hover:bg-dark-elevated',
+                isActive && 'bg-light-elevated dark:bg-dark-elevated text-primary font-medium'
+              )
+            }
+          >
+            Admin
+          </NavLink>
+        </nav>
         {isMobile && (
           <IconButton
             onClick={() => setRightExpanded(true)}

@@ -5,7 +5,7 @@ export interface ChatRequest {
 
 export interface QueryResult {
   success?: boolean;
-  rows: Array<Record<string, any>>;
+  rows: Array<Record<string, unknown>>;
   count: number;
   columns?: string[];
   error?: string;
@@ -18,7 +18,7 @@ export interface ConversationMessage {
   sql?: string;
   results?: QueryResult;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   feedback?: string | null;
   timestamp: string;
 }
@@ -34,7 +34,7 @@ export interface ConversationResponse extends ConversationMetadata {
   messages: ConversationMessage[];
 }
 
-export interface ConversationListItem extends ConversationMetadata {}
+export type ConversationListItem = ConversationMetadata;
 
 export interface ConversationsListResponse {
   conversations: ConversationListItem[];
@@ -44,5 +44,41 @@ export interface ConversationsListResponse {
 export interface HealthResponse {
   status: string;
   version: string;
+}
+
+export interface SchemaColumnDefinition {
+  name: string;
+  type: string;
+  primary_key?: boolean;
+  description?: string;
+}
+
+export interface SchemaRelationshipDefinition {
+  from: string;
+  to: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface SchemaTableDefinition {
+  table_name: string;
+  columns: SchemaColumnDefinition[];
+  relationships: SchemaRelationshipDefinition[];
+  description?: string | null;
+  tags: string[];
+  is_active: boolean;
+}
+
+export interface SchemaDetectRequest {
+  question: string;
+  active_only?: boolean;
+  allow_llm_fallback?: boolean;
+}
+
+export interface SchemaDetectResponse {
+  target_tables: string[];
+  confidence: number;
+  strategy: 'heuristic' | 'llm_fallback';
+  matched_reasons: string[];
 }
 

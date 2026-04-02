@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Save,
   PartyPopper,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface StageStepProps {
@@ -19,7 +20,7 @@ interface StageStepProps {
   isLast?: boolean;
 }
 
-const stageIcons: Record<string, any> = {
+const stageIcons: Record<string, LucideIcon> = {
   initializing: Rocket,
   loading_conversation: MessageSquare,
   analyzing_intent: Search,

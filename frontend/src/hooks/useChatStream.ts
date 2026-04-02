@@ -3,6 +3,27 @@ import { useChatStore } from '../stores/useChatStore';
 import { useProcessStore } from '../stores/useProcessStore';
 import { api } from '../services/api';
 import type { SSEEvent } from '../types/events';
+import type { QueryResult } from '../types/api';
+
+type SSEEventType = SSEEvent['type'];
+
+const SSE_TYPES: ReadonlySet<string> = new Set([
+  'conversation_id',
+  'stage',
+  'intent',
+  'schema',
+  'similar_examples',
+  'sql',
+  'validation',
+  'result',
+  'error',
+  'formatted_response',
+  'complete',
+]);
+
+function isSSEEventType(value: string): value is SSEEventType {
+  return SSE_TYPES.has(value);
+}
 
 export const useChatStream = () => {
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +58,7 @@ export const useChatStream = () => {
 
       let buffer = '';
       let finalSQL = '';
-      let finalResults: any = null;
+      let finalResults: QueryResult | undefined = undefined;
       let formattedMarkdown = '';
 
       while (true) {
@@ -56,35 +77,34 @@ export const useChatStream = () => {
             if (!eventLine || !dataLine) continue;
 
             const eventType = eventLine.replace('event: ', '').trim();
-            const data = JSON.parse(dataLine.replace('data: ', ''));
+            const data = JSON.parse(dataLine.replace('data: ', '')) as unknown;
 
             // Update process store for visualizer
-            const sseEvent: SSEEvent = {
-              type: eventType as any,
-              data,
-            };
-            updateFromSSE(sseEvent);
+            if (isSSEEventType(eventType)) {
+              updateFromSSE({ type: eventType, data } as SSEEvent);
+            }
 
             // Capture SQL and results for the message
+            const payload = data as Record<string, unknown>;
             if (eventType === 'conversation_id') {
-              setActiveConversation(data.conversation_id);
+              setActiveConversation(String(payload.conversation_id || ''));
             } else if (eventType === 'sql') {
-              finalSQL = data.sql;
+              finalSQL = String(payload.sql || '');
               updateLastMessage({ sql: finalSQL });
             } else if (eventType === 'result') {
               finalResults = {
-                rows: data.rows,
-                count: data.count,
-                columns: data.columns,
+                rows: (payload.rows as Array<Record<string, unknown>>) ?? [],
+                count: Number(payload.count ?? 0),
+                columns: (payload.columns as string[] | undefined) ?? undefined,
               };
               updateLastMessage({ results: finalResults });
             } else if (eventType === 'formatted_response') {
-              formattedMarkdown = data.markdown || '';
+              formattedMarkdown = String(payload.markdown || '');
               updateLastMessage({
                 content: formattedMarkdown,
                 metadata: {
-                  format_method: data.format_method,
-                  has_llm_summary: data.has_llm_summary,
+                  format_method: payload.format_method,
+                  has_llm_summary: payload.has_llm_summary,
                 },
               });
             } else if (eventType === 'complete') {
@@ -94,9 +114,10 @@ export const useChatStream = () => {
                 results: finalResults,
               });
             } else if (eventType === 'error') {
+              const errorText = typeof payload.error === 'string' ? payload.error : 'Unknown error';
               updateLastMessage({
                 content: 'Error occurred',
-                error: data.error,
+                error: errorText,
               });
             }
           } catch (parseError) {

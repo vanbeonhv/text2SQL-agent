@@ -25,10 +25,14 @@ class AgentState(TypedDict, total=False):
     """
     question: str
     intent: str
+    intent_details: Dict[str, Any]
+    target_tables: List[str]
     formatted_response: str
     format_method: str
     has_llm_summary: bool
     schema: Dict[str, Any]
+    schema_override: Dict[str, Any]
+    schema_source: str
     conversation_history: List[Dict[str, str]]
     similar_examples: List[Dict[str, Any]]
     generated_sql: str
