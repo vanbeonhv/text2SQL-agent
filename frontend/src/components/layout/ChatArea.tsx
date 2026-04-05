@@ -18,17 +18,17 @@ export const ChatArea = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data, isLoading } = useConversation(activeConversationId);
+  const showHistoryLoading = isLoading && !isStreaming;
 
   // Sync loading state into store so ConversationList can disable buttons
   useEffect(() => {
-    setIsLoadingHistory(isLoading);
-  }, [isLoading, setIsLoadingHistory]);
+    setIsLoadingHistory(showHistoryLoading);
+  }, [showHistoryLoading, setIsLoadingHistory]);
 
   // Sync React Query cached data into the store when conversation changes.
-  // refetchOnWindowFocus is disabled and staleTime is 5min, so this won't
-  // overwrite in-progress streaming messages.
+  // Skip while streaming so empty/partial GET responses do not wipe optimistic UI.
   useEffect(() => {
-    if (!data) return;
+    if (!data || isStreaming) return;
     const mapped: Message[] = data.messages.map((msg) => ({
       id: `${data.id}-${msg.id}`,
       role: msg.role,
@@ -47,7 +47,7 @@ export const ChatArea = () => {
       created_at: data.created_at,
       updated_at: data.updated_at,
     });
-  }, [data, setMessages, setConversationMetadata]);
+  }, [data, isStreaming, setMessages, setConversationMetadata]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -84,7 +84,7 @@ export const ChatArea = () => {
       {/* Messages area */}
       <div className="relative flex-1 overflow-y-auto px-4 py-6 min-h-0">
         {/* Loading overlay */}
-        {isLoading && (
+        {showHistoryLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-[#0A0A0F]/60 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3 rounded-xl border border-[#E9D5FF] dark:border-[#2D2D3A] bg-white dark:bg-[#1A1A24] px-8 py-6 shadow-lg">
               <Loader2 className="h-8 w-8 animate-spin text-purple-500 dark:text-purple-400" />

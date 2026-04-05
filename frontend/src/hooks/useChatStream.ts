@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '../stores/useChatStore';
 import { useProcessStore } from '../stores/useProcessStore';
 import { api } from '../services/api';
@@ -27,6 +28,7 @@ function isSSEEventType(value: string): value is SSEEventType {
 
 export const useChatStream = () => {
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const { addMessage, setIsStreaming, activeConversationId, updateLastMessage, setActiveConversation } = useChatStore();
   const { updateFromSSE, resetProcess } = useProcessStore();
 
@@ -133,11 +135,20 @@ export const useChatStream = () => {
         error: errorMessage,
       });
     } finally {
+      try {
+        const id = useChatStore.getState().activeConversationId;
+        if (id) {
+          await queryClient.refetchQueries({ queryKey: ['conversation', id] });
+        }
+      } catch (refetchErr) {
+        console.error('Failed to refetch conversation after stream:', refetchErr);
+      }
       setIsStreaming(false);
     }
   }, [
     activeConversationId,
     addMessage,
+    queryClient,
     setIsStreaming,
     setActiveConversation,
     updateFromSSE,
