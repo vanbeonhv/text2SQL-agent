@@ -53,4 +53,4 @@ def test_sql_validator_blocks_comments():
     result = sql_validator.validate_sql(sql)
     
     assert result["valid"] is False
-    assert "comment" in str(result["errors"]).lower()
+    assert "chú thích" in str(result["errors"]).lower()

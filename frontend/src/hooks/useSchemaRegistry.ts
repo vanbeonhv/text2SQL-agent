@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
-import type { SchemaTableDefinition } from '../types/api';
+import type { SchemaBusinessContextResponse, SchemaTableDefinition } from '../types/api';
 
 export const useSchemaTables = (activeOnly: boolean = true) => {
   return useQuery<SchemaTableDefinition[]>({
@@ -40,6 +40,24 @@ export const useDeleteSchemaTable = () => {
     mutationFn: (tableName: string) => api.deleteSchemaTable(tableName),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['schemaTables'] });
+    },
+  });
+};
+
+export const useSchemaBusinessContext = () => {
+  return useQuery<SchemaBusinessContextResponse>({
+    queryKey: ['schemaBusinessContext'],
+    queryFn: () => api.getSchemaBusinessContext(),
+    staleTime: 30_000,
+  });
+};
+
+export const useUpdateSchemaBusinessContext = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.putSchemaBusinessContext(payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['schemaBusinessContext'] });
     },
   });
 };

@@ -14,20 +14,20 @@ export const ValidationStatus = ({ validation }: ValidationStatusProps) => {
         ) : (
           <XCircle className="w-4 h-4 text-error" />
         )}
-        <h3 className="text-sm font-medium">SQL Validation</h3>
+        <h3 className="text-sm font-medium">Kiểm tra SQL</h3>
       </div>
 
       {validation.valid ? (
         <div className="flex items-center gap-2 text-success">
           <CheckCircle2 className="w-4 h-4" />
-          <span className="text-sm">Query passed all validation checks</span>
+          <span className="text-sm">Truy vấn đã qua tất cả bước kiểm tra</span>
         </div>
       ) : (
         <div className="space-y-2">
           <div className="flex items-start gap-2 text-error">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium">Validation failed</p>
+              <p className="text-sm font-medium">Kiểm tra không thành công</p>
               {validation.errors && validation.errors.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {validation.errors.map((error, idx) => (

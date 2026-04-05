@@ -1,5 +1,5 @@
 """Chat history and conversation memory database operations."""
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import json
 from .connection import history_db
 
@@ -109,6 +109,13 @@ class HistoryManager:
             ON schema_table_definitions(is_active)
         """)
 
+        await history_db.execute("""
+            CREATE TABLE IF NOT EXISTS schema_registry_business_context (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                body TEXT NOT NULL
+            )
+        """)
+
         # Add feedback column to conversation_messages if missing (non-destructive migration)
         existing_msg_cols = await self._get_table_columns("conversation_messages")
         if "feedback" not in existing_msg_cols:
@@ -127,6 +134,8 @@ class HistoryManager:
         await history_db.execute("DROP TABLE IF EXISTS query_history")
         await history_db.execute("DROP TABLE IF EXISTS conversation_messages")
         await history_db.execute("DROP TABLE IF EXISTS conversations")
+        await history_db.execute("DROP TABLE IF EXISTS schema_registry_business_context")
+        await history_db.execute("DROP TABLE IF EXISTS schema_table_definitions")
 
         await self.init_database()
 
@@ -292,6 +301,38 @@ class HistoryManager:
             }
             for r in rows
         ]
+
+    async def get_registry_business_context(self) -> Tuple[Dict[str, Any], bool]:
+        """Load registry-level business_context JSON.
+
+        Returns:
+            (dict, explicit): explicit is False when no row exists yet (use file fallback
+            in retrieve_schema); True when a row exists (including empty {}).
+        """
+        row = await history_db.fetchone(
+            "SELECT body FROM schema_registry_business_context WHERE id = 1"
+        )
+        if not row or row["body"] is None:
+            return {}, False
+        try:
+            data = json.loads(row["body"])
+        except json.JSONDecodeError:
+            return {}, True
+        if not isinstance(data, dict):
+            return {}, True
+        return data, True
+
+    async def set_registry_business_context(self, data: Dict[str, Any]) -> None:
+        """Persist registry-level business_context (singleton row id=1)."""
+        body = json.dumps(data)
+        await history_db.execute(
+            """
+            INSERT INTO schema_registry_business_context (id, body)
+            VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET body = excluded.body
+            """,
+            (body,),
+        )
 
     async def set_table_definition_active(
         self,

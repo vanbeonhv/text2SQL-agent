@@ -83,6 +83,11 @@ async def retrieve_schema_node(state: AgentState) -> AgentState:
 
     if registry_defs:
         schema_source = "registry"
+        bc_db, bc_explicit = await history_manager.get_registry_business_context()
+        if bc_explicit:
+            business_context = bc_db
+        else:
+            business_context = schema_manager.load_schema().get("business_context") or {}
         schema_dict = {
             "tables": [
                 {
@@ -96,7 +101,7 @@ async def retrieve_schema_node(state: AgentState) -> AgentState:
                 for td in registry_defs
                 for r in (td.get("relationships", []) or [])
             ],
-            "business_context": {},
+            "business_context": business_context,
         }
         schema_text = schema_manager.format_schema_as_text(schema_dict)
 
@@ -264,7 +269,10 @@ async def save_success_node(state: AgentState) -> AgentState:
     response_content = state.get("formatted_response", "")
     if not response_content:
         # Fallback if formatting failed
-        response_content = f"SQL: {state['generated_sql']}\nReturned {state['execution_result'].get('count', 0)} rows"
+        response_content = (
+            f"SQL: {state['generated_sql']}\n"
+            f"Đã trả về {state['execution_result'].get('count', 0)} dòng"
+        )
     
     await conversation_service.save_assistant_response(
         conversation_id=state["conversation_id"],
@@ -303,7 +311,10 @@ async def fail_node(state: AgentState) -> AgentState:
     
     await conversation_service.save_assistant_response(
         conversation_id=state["conversation_id"],
-        content=f"Failed after {state['retry_count']} attempts: {state.get('error_message', 'Unknown error')}",
+        content=(
+            f"Không thể xử lý sau {state['retry_count']} lần thử: "
+            f"{state.get('error_message', 'Unknown error')}"
+        ),
         sql=state.get("generated_sql"),
         error=state.get("error_message", "Unknown error"),
         metadata={

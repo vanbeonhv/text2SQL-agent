@@ -134,6 +134,23 @@ class SchemaTableDefinitionResponse(BaseModel):
     is_active: bool
 
 
+class SchemaBusinessContextRequest(BaseModel):
+    """Update registry-level business_context (mirrors root `business_context` in schema.json)."""
+    business_context: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="String-keyed business rules and query patterns for the LLM",
+    )
+
+
+class SchemaBusinessContextResponse(BaseModel):
+    """Registry business_context for admin and transparency."""
+    business_context: Dict[str, Any] = Field(default_factory=dict)
+    explicit: bool = Field(
+        False,
+        description="True if a DB row exists; False means file fallback applies when using registry schema",
+    )
+
+
 class SchemaDetectRequest(BaseModel):
     """Request for detecting relevant tables for a question."""
     question: str = Field(..., description="User question / intent")

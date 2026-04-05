@@ -69,6 +69,11 @@ export interface SchemaTableDefinition {
   is_active: boolean;
 }
 
+export interface SchemaBusinessContextResponse {
+  business_context: Record<string, unknown>;
+  explicit: boolean;
+}
+
 export interface SchemaDetectRequest {
   question: string;
   active_only?: boolean;

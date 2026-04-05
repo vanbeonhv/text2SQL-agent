@@ -29,7 +29,7 @@ class LLMSummarizer:
         columns = result.get("columns", [])
 
         if count == 0:
-            return "No results found for your query."
+            return "Không có kết quả nào cho truy vấn của bạn."
 
         sample_data = rows[:20]
 
@@ -48,16 +48,23 @@ Columns: {columns}
 Data (up to 20 rows):
 {sample_data}
 
-Generate a complete markdown response that:
-1. Opens with 1 sentence directly answering the user's question
-2. Shows the data as a proper markdown table using | column | syntax
-3. Ends with 1-2 key insights or notable findings from the data
+Produce a complete markdown response with this structure:
+1. One opening sentence that directly answers the user's question
+2. A proper markdown data table (| header | syntax)
+3. One or two brief insights or notable findings from the data
 
-Rules:
-- Return only markdown content, no preamble like "Here is your answer"
-- The table must use standard markdown: header row, separator row (|---|), data rows
-- Keep insights concise and data-driven (mention specific values/names)
-- If count > 20, note that only 20 rows are shown out of {count} total"""
+Language and naming (critical):
+- Write ALL user-facing prose in Vietnamese: the opening sentence, insights, and any notes (e.g. row limits).
+- Keep markdown table column headers exactly as listed in Columns (same spelling/casing as the database).
+- Do not translate table or column names into Vietnamese.
+- Keep SQL inside code fences unchanged. Preserve literal cell values as returned (including English text).
+- Use standard international technical terms where natural (e.g. SQL) without translating them awkwardly.
+
+Formatting rules:
+- Return only markdown content; do not start with phrases like "Here is your answer" / "Đây là câu trả lời".
+- Table: header row, separator row (|---|), then data rows.
+- Keep insights concise and grounded in the data (cite specific values or names).
+- If count > 20, state in Vietnamese that only 20 rows are shown out of {count} total."""
 
         try:
             markdown = await self.llm.generate(
@@ -102,7 +109,7 @@ class ResponseFormatter:
         )
 
         if not markdown:
-            markdown = f"Query returned {result.get('count', 0)} row(s)."
+            markdown = f"Truy vấn trả về {result.get('count', 0)} dòng."
 
         return {
             "markdown": markdown,

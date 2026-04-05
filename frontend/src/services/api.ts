@@ -2,6 +2,7 @@ import type {
   ConversationResponse,
   ConversationsListResponse,
   HealthResponse,
+  SchemaBusinessContextResponse,
   SchemaDetectRequest,
   SchemaDetectResponse,
   SchemaTableDefinition,
@@ -68,6 +69,24 @@ export const api = {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+    return response.json();
+  },
+
+  async getSchemaBusinessContext(): Promise<SchemaBusinessContextResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/schema/business-context`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
+
+  async putSchemaBusinessContext(
+    businessContext: Record<string, unknown>,
+  ): Promise<SchemaBusinessContextResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/schema/business-context`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ business_context: businessContext }),
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
   },
 

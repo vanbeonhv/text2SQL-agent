@@ -3,7 +3,14 @@ import { Plus, Search, Save, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import type { SchemaColumnDefinition, SchemaRelationshipDefinition, SchemaTableDefinition } from '../../types/api';
-import { useDeleteSchemaTable, useSchemaTables, useUpdateSchemaTable, useUpsertSchemaTable } from '../../hooks/useSchemaRegistry';
+import {
+  useDeleteSchemaTable,
+  useSchemaBusinessContext,
+  useSchemaTables,
+  useUpdateSchemaBusinessContext,
+  useUpdateSchemaTable,
+  useUpsertSchemaTable,
+} from '../../hooks/useSchemaRegistry';
 
 const EMPTY_DEF: SchemaTableDefinition = {
   table_name: '',
@@ -33,11 +40,15 @@ export const SchemaTablesAdminPage = () => {
   const [relationshipsJson, setRelationshipsJson] = useState('[]');
   const [tagsText, setTagsText] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [businessContextJson, setBusinessContextJson] = useState('{}');
+  const [businessContextError, setBusinessContextError] = useState<string | null>(null);
 
   const tablesQuery = useSchemaTables(activeOnly);
+  const businessContextQuery = useSchemaBusinessContext();
   const upsert = useUpsertSchemaTable();
   const update = useUpdateSchemaTable();
   const del = useDeleteSchemaTable();
+  const updateBusinessContext = useUpdateSchemaBusinessContext();
 
   const editorTitle = useMemo(() => {
     if (mode === 'create') return 'Create table definition';
@@ -99,6 +110,25 @@ export const SchemaTablesAdminPage = () => {
     setRelationshipsJson(JSON.stringify(match.relationships ?? [], null, 2));
     setTagsText((match.tags ?? []).join(', '));
   }, [tablesQuery.data, items, mode, selected]);
+
+  useEffect(() => {
+    if (!businessContextQuery.data) return;
+    setBusinessContextJson(JSON.stringify(businessContextQuery.data.business_context ?? {}, null, 2));
+    setBusinessContextError(null);
+  }, [businessContextQuery.data]);
+
+  const saveBusinessContext = async () => {
+    setBusinessContextError(null);
+    try {
+      const parsed = parseJsonOrThrow<unknown>(businessContextJson, 'business_context');
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('business_context must be a JSON object (not an array or primitive)');
+      }
+      await updateBusinessContext.mutateAsync(parsed as Record<string, unknown>);
+    } catch (e) {
+      setBusinessContextError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const startCreate = () => {
     setMode('create');
@@ -183,6 +213,59 @@ export const SchemaTablesAdminPage = () => {
             {localError}
           </div>
         )}
+
+        <section className="surface border border-default rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-default flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">business_context (registry)</div>
+              <div className="text-xs text-muted mt-0.5">
+                JSON object merged into LLM schema text when using registered tables. If never saved, the app falls
+                back to <span className="font-code">backend/data/schema.json</span> business_context.
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={saveBusinessContext}
+              className="gap-2 shrink-0"
+              disabled={updateBusinessContext.isPending || businessContextQuery.isLoading}
+            >
+              <Save className="w-4 h-4" />
+              Save business context
+            </Button>
+          </div>
+          <div className="p-4 space-y-2">
+            {businessContextQuery.isError && (
+              <div className="text-sm text-error">Failed to load business_context</div>
+            )}
+            {businessContextError && (
+              <div className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                {businessContextError}
+              </div>
+            )}
+            <label htmlFor="schemaBusinessContextJson" className="text-xs text-muted sr-only">
+              business_context JSON
+            </label>
+            <textarea
+              id="schemaBusinessContextJson"
+              value={businessContextJson}
+              onChange={(e) => setBusinessContextJson(e.target.value)}
+              className={cn(
+                'w-full min-h-40 px-3 py-2 rounded-lg resize-y',
+                'surface elevated border border-default',
+                'focus:outline-none focus:ring-2 focus:ring-primary',
+                'placeholder:text-muted text-xs font-code',
+              )}
+              spellCheck={false}
+              placeholder='e.g. { "employment_status": "...", "query_notes": "..." }'
+              disabled={businessContextQuery.isLoading}
+            />
+            {businessContextQuery.data && (
+              <div className="text-xs text-muted">
+                Stored in DB: {businessContextQuery.data.explicit ? 'yes (explicit)' : 'no (file fallback until you save)'}
+              </div>
+            )}
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 min-h-[70vh]">
           {/* List panel */}

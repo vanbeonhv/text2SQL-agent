@@ -8,16 +8,18 @@ def test_schema_registry_table_created():
     """history_manager.init_database should create schema registry table."""
     asyncio.run(history_manager.reset_database())
 
+    tables = {"schema_table_definitions", "schema_registry_business_context"}
     rows = asyncio.run(
         history_db.fetchall(
             """
             SELECT name
             FROM sqlite_master
             WHERE type = 'table'
-              AND name = 'schema_table_definitions'
+              AND name IN ('schema_table_definitions', 'schema_registry_business_context')
             """
         )
     )
 
-    assert len(rows) == 1
+    found = {r["name"] for r in rows}
+    assert tables.issubset(found)
 

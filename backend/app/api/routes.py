@@ -15,6 +15,8 @@ from ..models.schemas import (
     SchemaTableDefinitionResponse,
     SchemaDetectRequest,
     SchemaDetectResponse,
+    SchemaBusinessContextRequest,
+    SchemaBusinessContextResponse,
 )
 from ..models.events import (
     StageEvent,
@@ -119,7 +121,7 @@ async def stream_agent_execution(
         if current_stage and current_stage != last_stage:
             stage_event = StageEvent(
                 stage=current_stage,
-                message=STAGE_MESSAGES.get(current_stage, "Processing..."),
+                message=STAGE_MESSAGES.get(current_stage, "Đang xử lý..."),
                 icon=STAGE_ICONS.get(current_stage)
             )
             yield format_sse_event("stage", stage_event.model_dump())
@@ -212,7 +214,7 @@ async def stream_agent_execution(
             success = state.get("current_stage") == "completed"
             complete_event = CompleteEvent(
                 success=success,
-                message="Query completed successfully!" if success else "Query failed"
+                message="Truy vấn hoàn tất thành công!" if success else "Truy vấn thất bại"
             )
             yield format_sse_event("complete", complete_event.model_dump())
             break
@@ -326,6 +328,27 @@ async def health_check():
         status="ok",
         version="1.0.0"
     )
+
+
+@router.get(
+    "/schema/business-context",
+    response_model=SchemaBusinessContextResponse,
+)
+async def get_schema_business_context():
+    """Return registry business_context and whether it is explicitly stored in DB."""
+    data, explicit = await history_manager.get_registry_business_context()
+    return SchemaBusinessContextResponse(business_context=data, explicit=explicit)
+
+
+@router.put(
+    "/schema/business-context",
+    response_model=SchemaBusinessContextResponse,
+)
+async def put_schema_business_context(request: SchemaBusinessContextRequest):
+    """Replace registry business_context (singleton)."""
+    await history_manager.set_registry_business_context(request.business_context)
+    data, explicit = await history_manager.get_registry_business_context()
+    return SchemaBusinessContextResponse(business_context=data, explicit=explicit)
 
 
 @router.post(
