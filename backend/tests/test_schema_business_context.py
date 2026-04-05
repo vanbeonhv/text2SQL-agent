@@ -22,10 +22,13 @@ def test_api_get_put_business_context():
 
     client = TestClient(app)
 
+    schema_manager.clear_cache()
+    expected_file_bc = schema_manager.load_schema().get("business_context") or {}
+
     get_r = client.get("/api/schema/business-context")
     assert get_r.status_code == 200
     body = get_r.json()
-    assert body["business_context"] == {}
+    assert body["business_context"] == expected_file_bc
     assert body["explicit"] is False
 
     put_r = client.put("/api/schema/business-context", json={"business_context": {"k": "v"}})

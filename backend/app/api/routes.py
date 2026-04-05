@@ -35,6 +35,7 @@ from ..models.events import (
 from ..agents.graph import agent_graph
 from ..services.conversation import conversation_service
 from ..database.history import history_manager
+from ..database.schema import schema_manager
 from ..tools.intent_analyzer import intent_analyzer
 from ..constants import STAGE_MESSAGES, STAGE_ICONS
 
@@ -337,7 +338,11 @@ async def health_check():
 async def get_schema_business_context():
     """Return registry business_context and whether it is explicitly stored in DB."""
     data, explicit = await history_manager.get_registry_business_context()
-    return SchemaBusinessContextResponse(business_context=data, explicit=explicit)
+    if explicit:
+        business_context = data
+    else:
+        business_context = schema_manager.load_schema().get("business_context") or {}
+    return SchemaBusinessContextResponse(business_context=business_context, explicit=explicit)
 
 
 @router.put(
